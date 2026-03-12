@@ -1335,8 +1335,24 @@ export function ChatScreen({
            onAiOrder(processed.orderItems, currentPersona.id);
         }
 
-        for (let i = 0; i < processed.parts.length; i++) {
-          const part = processed.parts[i];
+        const finalParts: any[] = [];
+        for (const part of processed.parts) {
+          if (part.msgType === 'text' && currentPersona.isSegmentResponse) {
+            const segments = part.text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
+            for (let i = 0; i < segments.length; i++) {
+              if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
+                finalParts[finalParts.length - 1].text += segments[i];
+              } else {
+                finalParts.push({ msgType: 'text', text: segments[i].trim() });
+              }
+            }
+          } else {
+            finalParts.push(part);
+          }
+        }
+
+        for (let i = 0; i < finalParts.length; i++) {
+          const part = finalParts[i];
           const aiMsg: Message = { 
             id: (Date.now() + i + 1).toString(), 
             personaId: currentPersona.id,
