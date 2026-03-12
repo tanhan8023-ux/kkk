@@ -960,18 +960,6 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="aiphones" icon={Smartphone} label="AI分身" onClick={() => onNavigate('aiphones')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('aiphones'); iconInputRef.current?.click(); }} /></div>;
       case 'app-photoalbum':
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="photoalbum" icon={ImageIcon} label="相册" onClick={() => onNavigate('photoalbum')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('photoalbum'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-weather':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="weather" icon={Cloud} label="天气" onClick={() => onNavigate('weather')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('weather'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-calendar':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="calendar" icon={CalendarIcon} label="日历" onClick={() => onNavigate('calendar')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('calendar'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-notes':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="notes" icon={FileText} label="备忘录" onClick={() => onNavigate('notes')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('notes'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-wallet':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="wallet" icon={Wallet} label="钱包" onClick={() => onNavigate('wallet')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('wallet'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-calculator':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="calculator" icon={LayoutGrid} label="计算器" onClick={() => onNavigate('calculator')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('calculator'); iconInputRef.current?.click(); }} /></div>;
-      case 'app-camera':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="camera" icon={CameraIcon} label="相机" onClick={() => onNavigate('camera')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('camera'); iconInputRef.current?.click(); }} /></div>;
       default:
         return null;
     }
@@ -979,7 +967,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
 
   return (
     <div 
-      className="w-full h-full pt-16 pb-6 flex flex-col overflow-hidden relative"
+      className="w-full h-full pb-6 flex flex-col overflow-hidden relative"
       onPointerDown={(e) => {
         // Only trigger on the background, not on children
         if (e.target === e.currentTarget) {

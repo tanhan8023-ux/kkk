@@ -54,12 +54,6 @@ const ChatBubbleWrapper = React.memo(({
 
 import { LoveWidgetScreen } from './components/LoveWidgetScreen';
 import { PhotoAlbumScreen } from './components/PhotoAlbumScreen';
-import { WeatherScreen } from './components/WeatherScreen';
-import { CalendarScreen } from './components/CalendarScreen';
-import { NotesScreen } from './components/NotesScreen';
-import { WalletScreen } from './components/WalletScreen';
-import { CalculatorScreen } from './components/CalculatorScreen';
-import { CameraScreen } from './components/CameraScreen';
 import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry } from './types';
 import { AnimatePresence, motion } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
@@ -694,7 +688,7 @@ export default function App() {
         console.error("Failed to generate autonomous status:", e);
       }
       
-    }, 60000); // Every minute
+    }, 300000); // Every 5 minutes
     
     return () => clearInterval(interval);
   }, [personas, apiSettings, worldbook, userProfile, isReady]);
@@ -1951,99 +1945,6 @@ export default function App() {
                   className="w-full h-full absolute inset-0 z-20 bg-white"
                 >
                   <PhotoAlbumScreen 
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'weather' && (
-                <motion.div
-                  key="weather"
-                  initial={{ opacity: 0, x: '100%' }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: '100%' }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
-                >
-                  <WeatherScreen 
-                    onBack={() => setCurrentScreen('home')}
-                    theme={theme}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'calendar' && (
-                <motion.div
-                  key="calendar"
-                  initial={{ opacity: 0, x: '100%' }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: '100%' }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
-                >
-                  <CalendarScreen 
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'notes' && (
-                <motion.div
-                  key="notes"
-                  initial={{ opacity: 0, x: '100%' }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: '100%' }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
-                >
-                  <NotesScreen 
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'wallet' && (
-                <motion.div
-                  key="wallet"
-                  initial={{ opacity: 0, x: '100%' }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: '100%' }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
-                >
-                  <WalletScreen 
-                    userProfile={userProfile}
-                    setUserProfile={setUserProfile}
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'calculator' && (
-                <motion.div
-                  key="calculator"
-                  initial={{ opacity: 0, x: '100%' }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: '100%' }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-black"
-                >
-                  <CalculatorScreen 
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
-              {currentScreen === 'camera' && (
-                <motion.div
-                  key="camera"
-                  initial={{ opacity: 0, scale: 1.1 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-black"
-                >
-                  <CameraScreen 
                     onBack={() => setCurrentScreen('home')}
                   />
                 </motion.div>

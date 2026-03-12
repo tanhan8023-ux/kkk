@@ -5,7 +5,6 @@ import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
 import { fetchAiResponse, generateMoment, checkIfPersonaIsOffline } from '../services/aiService';
 
-import { WalletScreen } from './WalletScreen';
 import { ChatInput } from './ChatInput';
 import { ChatListView } from './ChatListView';
 import { AiPhoneModal } from './AiPhoneModal';
@@ -2452,7 +2451,7 @@ ${recentMessages}
                                 }
 
                                 return (
-                                  <div className="whitespace-pre-wrap break-words flex flex-col gap-2">
+                                  <div className="whitespace-pre-wrap break-words block">
                                     {msg.msgType === 'image' && msg.imageUrl && (
                                       <div className="my-1">
                                         <img 
@@ -4434,11 +4433,7 @@ ${recentMessages}
       {/* Wallet Screen Overlay */}
       <AnimatePresence>
         {showWallet && (
-          <WalletScreen 
-            userProfile={userProfile}
-            setUserProfile={setUserProfile}
-            onBack={() => setShowWallet(false)}
-          />
+          <div className="text-center py-20 text-neutral-400 text-sm">钱包功能已移除</div>
         )}
       </AnimatePresence>
 
