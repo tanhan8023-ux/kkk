@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse } from 'lucide-react';
 import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
@@ -230,7 +230,7 @@ export function ChatScreen({
         aiRef as any,
         false, // disable quote
         pesterPrompt, // additional instructions
-        "gemini-3-flash-preview", // Force Flash model
+        apiSettings.apiUrl ? undefined : "gemini-3-flash-preview", // Force Flash model only for official API
         undefined,
         persona.isOffline
       );
@@ -345,7 +345,7 @@ export function ChatScreen({
         aiRef,
         false,
         "",
-        "gemini-3-flash-preview",
+        apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
         undefined,
         false // user is always online
       );
@@ -636,7 +636,7 @@ export function ChatScreen({
               aiRef, 
               true, 
               "", 
-              "gemini-3-flash-preview",
+              apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
               undefined,
               currentPersona.isOffline
             );
@@ -1453,7 +1453,7 @@ export function ChatScreen({
           aiRef, 
           true, 
           "", 
-          "gemini-3-flash-preview",
+          apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
           undefined,
           currentPersona.isOffline
         );
@@ -1525,7 +1525,7 @@ export function ChatScreen({
         aiRef, 
         true, 
         "", 
-        "gemini-3-flash-preview",
+        apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
         undefined,
         currentPersona.isOffline
       );
@@ -2318,9 +2318,9 @@ ${recentMessages}
                 </div>
               )}
               {currentMessages.slice(-100).map((msg) => {
-                if (msg.isRecalled && !revealedRecalledIds.includes(msg.id)) {
+                if (msg.isRecalled) {
                   return (
-                    <div key={msg.id} className="flex justify-center my-2">
+                    <div key={msg.id} className="flex flex-col items-center my-2 gap-2">
                       <span 
                         className="text-[12px] text-neutral-400 bg-neutral-200/50 px-2 py-1 rounded-md cursor-pointer active:opacity-70"
                         onClick={() => {
@@ -2333,6 +2333,88 @@ ${recentMessages}
                       >
                         {msg.role === 'user' ? '你' : currentPersona?.name}撤回了一条消息 (点击{revealedRecalledIds.includes(msg.id) ? '隐藏' : '查看'})
                       </span>
+                      
+                      {/* Revealed Recalled Message Box */}
+                      {revealedRecalledIds.includes(msg.id) && (
+                        <div 
+                          className="bg-neutral-100 border border-neutral-200 rounded-xl p-3 max-w-[80%] text-[14px] text-neutral-600 shadow-sm cursor-pointer active:bg-neutral-200 transition-colors"
+                          onClick={() => setRevealedRecalledIds(prev => prev.filter(id => id !== msg.id))}
+                        >
+                          <div className="flex items-center gap-1 mb-1 text-[11px] text-neutral-400 font-medium">
+                            <RotateCcw size={12} />
+                            已撤回的内容
+                          </div>
+                          <div className="break-words">
+                            {(() => {
+                              const cleanText = msg.text
+                                .replace(/\|\|NEXT:[^|]+\|\|/g, '')
+                                .replace(/\[系统提示：[^\]]+\]/g, '')
+                                .replace(/【视觉感知报告[^】]+】/g, '')
+                                .replace(/\[视觉感知：[^\]]+\]/g, '')
+                                .trim();
+                              const parts = cleanText.split(/(\[STICKER:\s*[^\]]+\])/g);
+
+                              return (
+                                <div className="whitespace-pre-wrap break-words block">
+                                  {msg.msgType === 'image' && msg.imageUrl && (
+                                    <div className="my-1">
+                                      <img 
+                                        src={msg.imageUrl} 
+                                        className="max-w-full max-h-[200px] object-cover rounded-lg bg-neutral-200/50" 
+                                        alt="uploaded image" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    </div>
+                                  )}
+                                  {parts.map((part, i) => {
+                                    const stickerMatch = part.match(/\[STICKER:\s*([^\]]+)\]/);
+                                    if (stickerMatch) {
+                                      const content = stickerMatch[1].trim();
+                                      if (content === 'image') {
+                                         return <span key={i} className="text-xs text-neutral-400 block my-1">[表情包图片]</span>;
+                                      }
+
+                                      let src = content;
+                                      if (!content.startsWith('http') && !content.startsWith('data:')) {
+                                         src = `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(content)}`;
+                                      }
+
+                                      return (
+                                        <img 
+                                          key={i} 
+                                          src={src} 
+                                          alt="sticker" 
+                                          className="w-24 h-24 object-contain rounded-lg bg-neutral-200/50 my-1 block" 
+                                          referrerPolicy="no-referrer"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                        />
+                                      );
+                                    } else if (part && part.trim() !== '[图片]') {
+                                      return <span key={i}>{part}</span>;
+                                    }
+                                    return null;
+                                  })}
+                                  {msg.msgType === 'sticker' && msg.sticker && (
+                                    <div className="mt-2">
+                                      <img 
+                                        src={msg.sticker} 
+                                        className="w-24 h-24 object-contain rounded-lg bg-neutral-200/50 min-h-[6rem] min-w-[6rem]" 
+                                        alt="sticker" 
+                                        referrerPolicy="no-referrer"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -4565,7 +4647,77 @@ ${recentMessages}
       {/* Wallet Screen Overlay */}
       <AnimatePresence>
         {showWallet && (
-          <div className="text-center py-20 text-neutral-400 text-sm">钱包功能已移除</div>
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 bg-[#ededed] z-[110] flex flex-col"
+          >
+            <div className="h-12 flex items-center justify-between px-2 bg-[#ededed] shrink-0">
+              <button onClick={() => setShowWallet(false)} className="p-2 text-neutral-800">
+                <ChevronLeft size={24} />
+              </button>
+              <h1 className="font-semibold text-neutral-900 text-[16px]">
+                服务
+              </h1>
+              <div className="w-10" />
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pb-12">
+              <div className="bg-[#07c160] px-10 py-8 flex justify-between items-center text-white rounded-xl mx-2 mb-2 shadow-sm">
+                <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                  <Scan size={28} />
+                  <span className="text-[14px] font-medium">收付款</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                  <Wallet size={28} />
+                  <span className="text-[14px] font-medium">钱包</span>
+                  <span className="text-[11px] opacity-80">¥888.88</span>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl mx-2 mb-2 overflow-hidden">
+                <div className="px-4 py-3 border-b border-neutral-100 text-[13px] text-neutral-500 font-medium">
+                  金融理财
+                </div>
+                <div className="grid grid-cols-3 py-4">
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-orange-500 flex items-center justify-center"><CreditCard size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">信用卡还款</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-green-500 flex items-center justify-center"><PiggyBank size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">理财通</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-blue-500 flex items-center justify-center"><Shield size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">保险服务</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl mx-2 mb-2 overflow-hidden">
+                <div className="px-4 py-3 border-b border-neutral-100 text-[13px] text-neutral-500 font-medium">
+                  生活服务
+                </div>
+                <div className="grid grid-cols-3 py-4 gap-y-6">
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-blue-400 flex items-center justify-center"><Smartphone size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">手机充值</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-green-500 flex items-center justify-center"><HeartPulse size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">医疗健康</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                    <div className="w-8 h-8 text-orange-400 flex items-center justify-center"><Car size={24} /></div>
+                    <span className="text-[12px] text-neutral-700">出行服务</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

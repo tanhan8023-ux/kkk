@@ -971,13 +971,14 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
                 // Check for wxid_ pattern
                 const wxidMatch = msg.text.match(/wxid_[a-zA-Z0-9]+/);
                 const hasWxid = !!wxidMatch;
-                const isRecalled = msg.isRecalled && !revealedRecalledIds.includes(msg.id || '');
+                const isRecalled = msg.isRecalled;
                 
                 return (
                   <div key={msg.id || i} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'} relative group`}>
                     {isRecalled ? (
+                      <div className="flex flex-col items-center w-full my-1 gap-2">
                         <div 
-                          className="text-xs text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full self-center my-1 cursor-pointer active:opacity-70"
+                          className="text-xs text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full cursor-pointer active:opacity-70"
                           onClick={() => {
                             if (msg.id) {
                               if (revealedRecalledIds.includes(msg.id)) {
@@ -990,6 +991,23 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
                         >
                           {msg.isMe ? '你' : '对方'}撤回了一条消息 (点击{msg.id && revealedRecalledIds.includes(msg.id) ? '隐藏' : '查看'})
                         </div>
+                        
+                        {/* Revealed Recalled Message Box */}
+                        {msg.id && revealedRecalledIds.includes(msg.id) && (
+                          <div 
+                            className="bg-neutral-100 border border-neutral-200 rounded-xl p-3 max-w-[80%] text-[14px] text-neutral-600 shadow-sm cursor-pointer active:bg-neutral-200 transition-colors"
+                            onClick={() => setRevealedRecalledIds(prev => prev.filter(id => id !== msg.id))}
+                          >
+                            <div className="flex items-center gap-1 mb-1 text-[11px] text-neutral-400 font-medium">
+                              <RotateCcw size={12} />
+                              已撤回的内容
+                            </div>
+                            <div className="break-words">
+                              {msg.text}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <>
                         <div 

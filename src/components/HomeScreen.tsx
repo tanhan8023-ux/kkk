@@ -984,6 +984,8 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="aiphones" icon={Smartphone} label="AI分身" onClick={() => onNavigate('aiphones')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('aiphones'); iconInputRef.current?.click(); }} /></div>;
       case 'app-photoalbum':
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="photoalbum" icon={ImageIcon} label="相册" onClick={() => onNavigate('photoalbum')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('photoalbum'); iconInputRef.current?.click(); }} /></div>;
+      case 'app-wallet':
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="wallet" icon={Wallet} label="钱包" onClick={() => onNavigate('wallet')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('wallet'); iconInputRef.current?.click(); }} /></div>;
       default:
         return null;
     }

@@ -54,7 +54,8 @@ const ChatBubbleWrapper = React.memo(({
 
 import { LoveWidgetScreen } from './components/LoveWidgetScreen';
 import { PhotoAlbumScreen } from './components/PhotoAlbumScreen';
-import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry } from './types';
+import { WalletScreen } from './components/WalletScreen';
+import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry, Transaction } from './types';
 import { AnimatePresence, motion } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { storageService } from './services/storageService';
@@ -67,6 +68,22 @@ export default function App() {
   const generatingDiariesRef = useRef<Set<string>>(new Set());
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Wallet State
+  const handleRecharge = (amount: number) => {
+    const newTransaction: Transaction = {
+      id: Date.now().toString(),
+      amount,
+      type: 'top_up',
+      description: '充值',
+      timestamp: Date.now()
+    };
+    setUserProfile(prev => ({
+      ...prev,
+      balance: (prev.balance || 0) + amount,
+      transactions: [newTransaction, ...(prev.transactions || [])]
+    }));
+  };
 
   useEffect(() => {
     const checkApiKey = async () => {
@@ -700,6 +717,8 @@ export default function App() {
         if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
           console.warn("Autonomous status update failed due to quota. Entering cooldown.");
           setLastApiErrorTime(Date.now());
+        } else if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
+          console.warn("Autonomous status update skipped due to network error (Failed to fetch).");
         } else {
           console.error("Failed to generate autonomous status:", error);
         }
@@ -754,8 +773,12 @@ export default function App() {
               return p;
             }));
             
-          } catch (e) {
-            console.error(`Failed to generate diary for ${persona.name}:`, e);
+          } catch (e: any) {
+            if (e?.message?.includes("Failed to fetch") || e?.message?.includes("NetworkError")) {
+              console.warn(`Failed to generate diary for ${persona.name} due to network error (Failed to fetch).`);
+            } else {
+              console.error(`Failed to generate diary for ${persona.name}:`, e);
+            }
           } finally {
             generatingDiariesRef.current.delete(persona.id);
           }
@@ -1068,7 +1091,11 @@ export default function App() {
         if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
           setLastApiErrorTime(Date.now());
         }
-        console.error("Failed to generate AI auto-reply:", e);
+        if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
+          console.warn("Failed to generate AI auto-reply due to network error (Failed to fetch).");
+        } else {
+          console.error("Failed to generate AI auto-reply:", e);
+        }
       }
     }
 
@@ -1124,7 +1151,11 @@ export default function App() {
       if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED")) {
         setLastApiErrorTime(Date.now());
       }
-      console.error("Failed to generate reply:", error);
+      if (errorMsgText.includes("Failed to fetch") || errorMsgText.includes("NetworkError")) {
+        console.warn("Failed to generate reply due to network error (Failed to fetch).");
+      } else {
+        console.error("Failed to generate reply:", error);
+      }
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         personaId: personaId,
@@ -1279,8 +1310,12 @@ export default function App() {
         body: `${targetPersona.name}: ${responseText}`,
         personaId: targetPersona.id
       });
-    } catch (e) {
-      console.error("Failed to generate AI response for arrived order", e);
+    } catch (e: any) {
+      if (e?.message?.includes("Failed to fetch") || e?.message?.includes("NetworkError")) {
+        console.warn("Failed to generate AI response for arrived order due to network error (Failed to fetch).");
+      } else {
+        console.error("Failed to generate AI response for arrived order", e);
+      }
     }
   };
 
@@ -1320,7 +1355,7 @@ export default function App() {
         aiRef,
         true,
         "",
-        "gemini-3-flash-preview" // Force Flash model to avoid Pro rate limits
+        apiSettings.apiUrl ? undefined : "gemini-3-flash-preview" // Force Flash model only for official API to avoid Pro rate limits
       );
       
       const responseText = aiResponse.responseText;
@@ -1372,6 +1407,8 @@ export default function App() {
     } catch (e: any) {
       if (e?.message?.includes('频率限制') || e?.message?.includes('429')) {
         console.warn("Silence check skipped due to rate limit.");
+      } else if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+        console.warn("Silence check skipped due to network error (Failed to fetch).");
       } else {
         console.error("Failed to generate silence check response", e);
       }
@@ -1504,8 +1541,12 @@ export default function App() {
          return [...updated, aiMsg];
        });
        
-    } catch (e) {
-      console.error("Failed to generate AI response for order", e);
+    } catch (e: any) {
+      if (e?.message?.includes("Failed to fetch") || e?.message?.includes("NetworkError")) {
+        console.warn("Failed to generate AI response for order due to network error (Failed to fetch).");
+      } else {
+        console.error("Failed to generate AI response for order", e);
+      }
     }
   };
 
@@ -1827,6 +1868,24 @@ export default function App() {
                     privateChats={treeHolePrivateChats}
                     setPrivateChats={setTreeHolePrivateChats}
                     theme={theme}
+                  />
+                </motion.div>
+              )}
+
+              {currentScreen === 'wallet' && (
+                <motion.div
+                  key="wallet"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full h-full absolute inset-0 z-20 bg-white"
+                >
+                  <WalletScreen 
+                    balance={userProfile.balance || 0}
+                    transactions={userProfile.transactions || []}
+                    onRecharge={handleRecharge}
+                    onBack={() => setCurrentScreen('home')}
                   />
                 </motion.div>
               )}
