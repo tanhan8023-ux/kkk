@@ -1872,24 +1872,6 @@ export default function App() {
                 </motion.div>
               )}
 
-              {currentScreen === 'wallet' && (
-                <motion.div
-                  key="wallet"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
-                >
-                  <WalletScreen 
-                    balance={userProfile.balance || 0}
-                    transactions={userProfile.transactions || []}
-                    onRecharge={handleRecharge}
-                    onBack={() => setCurrentScreen('home')}
-                  />
-                </motion.div>
-              )}
-
               {currentScreen === 'taobao' && (
                 <motion.div
                   key="taobao"

@@ -8,6 +8,7 @@ import { fetchAiResponse, generateMoment, checkIfPersonaIsOffline, summarizeChat
 import { ChatInput } from './ChatInput';
 import { ChatListView } from './ChatListView';
 import { AiPhoneModal } from './AiPhoneModal';
+import { WalletScreen } from './WalletScreen';
 
 interface Props {
   personas: Persona[];
@@ -71,6 +72,7 @@ export function ChatScreen({
 }: Props) {
   const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'moments' | 'favorites' | 'theater'>('chat');
   const [showWallet, setShowWallet] = useState(false);
+  const [showActualWallet, setShowActualWallet] = useState(false);
   const [showSaveToast, setShowSaveToast] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -3087,6 +3089,19 @@ ${recentMessages}
               <button 
                 onClick={() => {
                   setShowPlusMenu(false);
+                  setShowWallet(true);
+                }} 
+                className="flex flex-col items-center gap-2"
+              >
+                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-neutral-700 shadow-sm">
+                  <Wallet size={28} />
+                </div>
+                <span className="text-[12px] text-neutral-500">钱包</span>
+              </button>
+
+              <button 
+                onClick={() => {
+                  setShowPlusMenu(false);
                   const prompt = window.prompt("想要什么样的表情包？(例如：开心的猫咪)");
                   if (prompt) {
                     handleSend(`给我发一个表情包：${prompt}`);
@@ -4654,7 +4669,7 @@ ${recentMessages}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed inset-0 bg-[#ededed] z-[110] flex flex-col"
           >
-            <div className="h-12 flex items-center justify-between px-2 bg-[#ededed] shrink-0">
+            <div className="h-20 pt-12 flex items-center justify-between px-2 bg-[#ededed] shrink-0">
               <button onClick={() => setShowWallet(false)} className="p-2 text-neutral-800">
                 <ChevronLeft size={24} />
               </button>
@@ -4670,10 +4685,12 @@ ${recentMessages}
                   <Scan size={28} />
                   <span className="text-[14px] font-medium">收付款</span>
                 </div>
-                <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70">
+                <div className="flex flex-col items-center gap-2 cursor-pointer active:opacity-70" onClick={() => {
+                  setShowActualWallet(true);
+                }}>
                   <Wallet size={28} />
                   <span className="text-[14px] font-medium">钱包</span>
-                  <span className="text-[11px] opacity-80">¥888.88</span>
+                  <span className="text-[11px] opacity-80">¥{(userProfile.balance || 0).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -5274,6 +5291,31 @@ ${recentMessages}
           }}
           theme={theme}
         />
+      )}
+
+      {/* Wallet Modal */}
+      {showActualWallet && (
+        <div className="fixed inset-0 z-[120] bg-white">
+          <WalletScreen 
+            balance={userProfile.balance || 0}
+            transactions={userProfile.transactions || []}
+            onRecharge={(amount) => {
+              const newTransaction: Transaction = {
+                id: Date.now().toString(),
+                amount,
+                type: 'top_up',
+                description: '充值',
+                timestamp: Date.now()
+              };
+              setUserProfile(prev => ({
+                ...prev,
+                balance: (prev.balance || 0) + amount,
+                transactions: [newTransaction, ...(prev.transactions || [])]
+              }));
+            }}
+            onBack={() => setShowActualWallet(false)}
+          />
+        </div>
       )}
     </div>
   );
