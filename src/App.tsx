@@ -1826,6 +1826,7 @@ export default function App() {
                     onAddWechat={handleAddNpcToWechat}
                     privateChats={treeHolePrivateChats}
                     setPrivateChats={setTreeHolePrivateChats}
+                    theme={theme}
                   />
                 </motion.div>
               )}

@@ -160,6 +160,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
   const imageInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isRestoringScroll = useRef<boolean>(true);
   const touchStartTime = useRef<number>(0);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -337,6 +338,28 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  React.useLayoutEffect(() => {
+    // Restore scroll position synchronously before paint
+    if (scrollContainerRef.current && currentPage > 0) {
+      const width = scrollContainerRef.current.clientWidth;
+      if (width > 0) {
+        scrollContainerRef.current.scrollLeft = currentPage * width;
+        isRestoringScroll.current = false;
+      } else {
+        // Fallback if width is 0 during layout effect
+        const timer = setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft = currentPage * scrollContainerRef.current.clientWidth;
+          }
+          isRestoringScroll.current = false;
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      isRestoringScroll.current = false;
+    }
+  }, []); // Run once on mount
 
   const loadWeather = useCallback(async () => {
     setLoading(true);
@@ -991,11 +1014,14 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           onScroll={(e) => {
+            if (isRestoringScroll.current) return;
             const scrollLeft = e.currentTarget.scrollLeft;
             const width = e.currentTarget.clientWidth;
-            const page = Math.round(scrollLeft / width);
-            if (page !== currentPage) {
-              setCurrentPage(page);
+            if (width > 0) {
+              const page = Math.round(scrollLeft / width);
+              if (!isNaN(page) && page !== currentPage) {
+                setCurrentPage(page);
+              }
             }
           }}
           ref={scrollContainerRef}
