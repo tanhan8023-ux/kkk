@@ -113,9 +113,10 @@ export async function checkIfPersonaIsOffline(
   apiSettings: ApiSettings,
   worldbook: WorldbookSettings,
   userProfile: UserProfile,
-  aiRef: React.MutableRefObject<GoogleGenAI | null>
+  aiRef: React.MutableRefObject<GoogleGenAI | null>,
+  contextMessages: { role: string; content: string }[] = []
 ): Promise<boolean> {
-  const prompt = `你现在是${persona.name}。请根据你的人设、当前心情、当前情景以及现在的时间，深度判断你现在是否“在线”（可以回复用户）还是“离线”（不方便回复）。
+  const prompt = `你现在是${persona.name}。请根据你的人设、当前心情、当前情景、现在的时间以及最近的聊天记录，深度判断你现在是否“在线”（可以回复用户）还是“离线”（不方便回复）。
 
 人设设定：${persona.instructions}
 当前心情：${persona.mood || '正常'}
@@ -123,16 +124,17 @@ export async function checkIfPersonaIsOffline(
 现在的时间是：${new Date().toLocaleString('zh-CN')}
 
 判断逻辑：
-1. 如果心情极度低落、愤怒或需要独处，请倾向于“离线”。
-2. 如果情景是“睡觉”、“工作”、“学习”或“忙碌”，请倾向于“离线”。
-3. 如果心情愉悦、放松，且情景允许，请倾向于“在线”。
-4. 考虑人设的性格（例如：高冷的人可能更倾向于离线，粘人的人可能更倾向于在线）。
+1. 如果你在聊天中明确表示要“去睡觉”、“有事走开”、“下线”或“不聊了”，请务必判定为“离线”。
+2. 如果心情极度低落、愤怒或需要独处，请倾向于“离线”。
+3. 如果情景是“睡觉”、“工作”、“学习”或“忙碌”，请倾向于“离线”。
+4. 如果心情愉悦、放松，且情景允许，请倾向于“在线”。
+5. 考虑人设的性格（例如：高冷的人可能更倾向于离线，粘人的人可能更倾向于在线）。
 
 要求：如果认为自己现在应该在线，请回复“在线”；如果认为自己现在应该离线，请回复“离线”。不要输出其他任何内容。`;
 
   const { responseText } = await fetchAiResponse(
     prompt,
-    [], // contextMessages
+    contextMessages,
     persona,
     apiSettings,
     worldbook,
@@ -144,6 +146,37 @@ export async function checkIfPersonaIsOffline(
   );
   
   return responseText.includes('离线');
+}
+
+export async function summarizeChat(
+  messages: { role: string; content: string }[],
+  persona: Persona,
+  apiSettings: ApiSettings,
+  worldbook: WorldbookSettings,
+  userProfile: UserProfile,
+  aiRef: React.MutableRefObject<GoogleGenAI | null>
+): Promise<string> {
+  const prompt = `请总结以下你（${persona.name}）与用户（${userProfile.name}）之间的聊天记录。
+要求：
+1. 总结要精炼，突出重点。
+2. 语气要客观，但可以带一点你（${persona.name}）的人设特色。
+3. 总结内容控制在100字以内。
+4. 如果聊天记录太少，请回复“聊天记录太少，无法总结”。`;
+
+  const { responseText } = await fetchAiResponse(
+    prompt,
+    messages,
+    persona,
+    apiSettings,
+    worldbook,
+    userProfile,
+    aiRef,
+    false,
+    "",
+    undefined
+  );
+  
+  return responseText;
 }
 
 export async function generateUserRemark(

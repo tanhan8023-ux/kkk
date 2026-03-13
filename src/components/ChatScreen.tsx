@@ -3,7 +3,7 @@ import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Boo
 import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
-import { fetchAiResponse, generateMoment, checkIfPersonaIsOffline } from '../services/aiService';
+import { fetchAiResponse, generateMoment, checkIfPersonaIsOffline, summarizeChat } from '../services/aiService';
 
 import { ChatInput } from './ChatInput';
 import { ChatListView } from './ChatListView';
@@ -90,6 +90,8 @@ export function ChatScreen({
   const [newStickerName, setNewStickerName] = useState('');
   const [newStickerUrl, setNewStickerUrl] = useState('');
   const [showChatSettings, setShowChatSettings] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryResult, setSummaryResult] = useState<string | null>(null);
   const [showAiPhone, setShowAiPhone] = useState(false);
 
   useEffect(() => {
@@ -1762,6 +1764,51 @@ ${recentMessages}
     }
   };
 
+  const handleClearHistory = () => {
+    if (!currentPersona) return;
+    if (window.confirm('确定要清除与该好友的所有聊天记录吗？此操作不可撤销。')) {
+      setMessages(prev => prev.filter(m => m.personaId !== currentPersona.id));
+      setShowChatSettings(false);
+    }
+  };
+
+  const handleResetAI = () => {
+    if (!currentPersona) return;
+    if (window.confirm('确定要重置该 AI 的状态吗？（心情、情景、状态消息将被清空）')) {
+      setPersonas(prev => prev.map(p => p.id === currentPersona.id ? { 
+        ...p, 
+        mood: '', 
+        context: '', 
+        statusMessage: '',
+        isOffline: false 
+      } : p));
+      setShowChatSettings(false);
+    }
+  };
+
+  const handleSummarizeChat = async () => {
+    if (!currentPersona) return;
+    setIsSummarizing(true);
+    setShowChatSettings(false);
+    try {
+      const chatMessages = messages
+        .filter(m => m.personaId === currentPersona.id && !m.hidden && !m.isRecalled)
+        .slice(-50)
+        .map(m => ({
+          role: m.role === 'model' ? 'assistant' : 'user',
+          content: m.text
+        }));
+      
+      const summary = await summarizeChat(chatMessages, currentPersona, apiSettings, worldbook, userProfile, aiRef);
+      setSummaryResult(summary);
+    } catch (e) {
+      console.error("Summarization error:", e);
+      setSummaryResult("总结失败，请稍后再试。");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
   const handleShowPersonaMoments = () => {
     if (!currentPersona) return;
     setShowPersonaMomentsId(currentPersona.id);
@@ -2032,11 +2079,20 @@ ${recentMessages}
                   <div onClick={handleOpenPersonaSettings} className="px-4 py-2 text-[14px] text-neutral-800 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
                     <Settings size={16} /> 我的人设
                   </div>
+                  <div onClick={handleSummarizeChat} className="px-4 py-2 text-[14px] text-neutral-800 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
+                    <MessageSquare size={16} /> 总结聊天
+                  </div>
+                  <div onClick={handleResetAI} className="px-4 py-2 text-[14px] text-neutral-800 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
+                    <RotateCcw size={16} /> 重置 AI
+                  </div>
                   <div onClick={handleShowPersonaMoments} className="px-4 py-2 text-[14px] text-neutral-800 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
                     <Camera size={16} /> 朋友圈
                   </div>
+                  <div onClick={handleClearHistory} className="px-4 py-2 text-[14px] text-red-500 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
+                    <Trash2 size={16} /> 清空记录
+                  </div>
                   <div onClick={handleDeletePersona} className="px-4 py-2 text-[14px] text-red-500 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
-                    <Trash2 size={16} /> 删除好友
+                    <UserPlus size={16} className="rotate-45" /> 删除好友
                   </div>
                   <div onClick={handleBlockPersona} className="px-4 py-2 text-[14px] text-red-500 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
                     <Ban size={16} /> {currentPersona?.isBlocked ? '解除拉黑' : '拉黑'}
@@ -2123,7 +2179,52 @@ ${recentMessages}
           </div>
         )}
 
-        {/* Contacts View */}
+      {/* Summary Modal */}
+      <AnimatePresence>
+        {(isSummarizing || summaryResult) && (
+          <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
+            >
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+                <h3 className="font-semibold text-neutral-900">聊天总结</h3>
+                {!isSummarizing && (
+                  <button onClick={() => setSummaryResult(null)} className="text-neutral-400 p-1">
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+              <div className="p-6">
+                {isSummarizing ? (
+                  <div className="flex flex-col items-center gap-4 py-4">
+                    <Loader2 size={32} className="text-emerald-500 animate-spin" />
+                    <p className="text-neutral-500 text-sm">正在分析聊天记录...</p>
+                  </div>
+                ) : (
+                  <div className="text-neutral-700 text-[14px] leading-relaxed whitespace-pre-wrap">
+                    {summaryResult}
+                  </div>
+                )}
+              </div>
+              {!isSummarizing && (
+                <div className="p-4 bg-neutral-50 flex justify-end">
+                  <button 
+                    onClick={() => setSummaryResult(null)}
+                    className="px-6 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium active:scale-95 transition-transform"
+                  >
+                    知道了
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Contacts View */}
         {activeTab === 'contacts' && (
           <div className="absolute inset-0 overflow-y-auto bg-white pb-[80px]">
             <div className="p-3 border-b border-neutral-100 bg-neutral-50 flex items-center gap-3 active:bg-neutral-100 cursor-pointer" onClick={() => setShowAddFriend(true)}>

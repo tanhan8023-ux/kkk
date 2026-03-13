@@ -28,6 +28,8 @@ interface Props {
   onPlayPause: () => void;
   onNext: () => void;
   onPrev: () => void;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
 }
 
 interface WeatherData {
@@ -136,9 +138,8 @@ const getWeatherDescription = (code: number) => {
   return "多云";
 };
 
-export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, userProfile, setUserProfile, songs, currentSongIndex, isPlaying, currentTime, duration, onPlayPause, onNext, onPrev }: Props) {
+export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, userProfile, setUserProfile, songs, currentSongIndex, isPlaying, currentTime, duration, onPlayPause, onNext, onPrev, currentPage, setCurrentPage }: Props) {
   const [time, setTime] = useState(new Date());
-  const [currentPage, setCurrentPage] = useState(0);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

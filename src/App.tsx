@@ -87,7 +87,9 @@ export default function App() {
     }
   };
   const [importProgress, setImportProgress] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const [isLocked, setIsLocked] = useState(true);
+  const [lastApiErrorTime, setLastApiErrorTime] = useState<number>(0);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [isCommentaryLoading, setIsCommentaryLoading] = useState(false);
@@ -654,28 +656,37 @@ export default function App() {
     if (!isReady) return;
     const interval = setInterval(async () => {
       if (personas.length === 0) return;
-      const randomPersona = personas[Math.floor(Math.random() * personas.length)];
+      
+      // Cooldown after 429 error (15 minutes)
+      if (Date.now() - lastApiErrorTime < 15 * 60 * 1000) {
+        console.log("Skipping autonomous update due to recent API quota error.");
+        return;
+      }
+
+      // Prioritize current chat persona, otherwise pick a random one
+      let targetPersona = personas.find(p => p.id === currentChatId);
+      if (!targetPersona || Math.random() > 0.7) {
+        targetPersona = personas[Math.floor(Math.random() * personas.length)];
+      }
+      
+      if (!targetPersona) return;
       
       try {
-        const newStatus = await generatePersonaStatus(
-          randomPersona,
-          apiSettings,
-          worldbook,
-          userProfile,
-          { current: null } // Dummy ref
-        );
-        const isOffline = await checkIfPersonaIsOffline(randomPersona, apiSettings, worldbook, userProfile, { current: null });
-        
-        // Also update user remark
-        const newUserRemark = await generateUserRemark(
-          randomPersona,
-          apiSettings,
-          worldbook,
-          userProfile,
-          { current: null }
-        );
+        const contextMessages = messages
+          .filter(m => m.personaId === targetPersona!.id)
+          .slice(-10)
+          .map(m => ({
+            role: m.role === 'model' ? 'assistant' : 'user',
+            content: cleanContextMessage(m.text)
+          }));
 
-        setPersonas(prev => prev.map(p => p.id === randomPersona.id ? { 
+        const [newStatus, isOffline, newUserRemark] = await Promise.all([
+          generatePersonaStatus(targetPersona, apiSettings, worldbook, userProfile, aiRef),
+          checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, contextMessages),
+          generateUserRemark(targetPersona, apiSettings, worldbook, userProfile, aiRef)
+        ]);
+
+        setPersonas(prev => prev.map(p => p.id === targetPersona!.id ? { 
           ...p, 
           statusMessage: newStatus, 
           isOffline,
@@ -684,14 +695,20 @@ export default function App() {
             userRemark: newUserRemark
           }
         } : p));
-      } catch (e) {
-        console.error("Failed to generate autonomous status:", e);
+      } catch (error: any) {
+        const errorMsg = error?.message || "";
+        if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+          console.warn("Autonomous status update failed due to quota. Entering cooldown.");
+          setLastApiErrorTime(Date.now());
+        } else {
+          console.error("Failed to generate autonomous status:", error);
+        }
       }
       
     }, 300000); // Every 5 minutes
     
     return () => clearInterval(interval);
-  }, [personas, apiSettings, worldbook, userProfile, isReady]);
+  }, [personas, apiSettings, worldbook, userProfile, isReady, currentChatId, lastApiErrorTime]);
 
   // Autonomous Diary Generation
   useEffect(() => {
@@ -1017,7 +1034,15 @@ export default function App() {
     let isOffline = false;
     if (targetPersona) {
       try {
-        isOffline = await checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef);
+        const contextMessages = messages
+          .filter(m => m.personaId === personaId)
+          .slice(-10)
+          .map(m => ({
+            role: m.role === 'model' ? 'assistant' : 'user',
+            content: cleanContextMessage(m.text)
+          }));
+
+        isOffline = await checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, contextMessages);
         if (isOffline) {
           const prompt = `你现在是${targetPersona.name}。用户给你发了一条消息，但你现在不在（或者不方便回复）。请根据你的人设设定，写一段简短的自动回复内容。
 人设设定：${targetPersona.instructions}
@@ -1033,12 +1058,16 @@ export default function App() {
             msgType: 'text',
             timestamp: new Date().toLocaleTimeString(),
             createdAt: Date.now() + 50,
-            isRead: true
+            isRead: false
           };
-          setMessages(prev => [...prev, autoReplyMsg]);
+          setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m).concat(autoReplyMsg));
           return;
         }
-      } catch (e) {
+      } catch (e: any) {
+        const errorMsg = e?.message || "";
+        if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+          setLastApiErrorTime(Date.now());
+        }
         console.error("Failed to generate AI auto-reply:", e);
       }
     }
@@ -1067,7 +1096,7 @@ export default function App() {
         `[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex]?.title} - ${songs[currentSongIndex]?.artist}。请结合歌曲氛围进行回复。]【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。`
       );
 
-      setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' } : m));
+      setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m));
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -1080,7 +1109,21 @@ export default function App() {
         isRead: true
       };
       setMessages(prev => [...prev, aiMsg]);
-    } catch (error) {
+
+      // Update offline status immediately based on the new context
+      if (targetPersona) {
+        const updatedContext = [...contextMessages, { role: 'assistant', content: responseText }].slice(-10);
+        checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, updatedContext)
+          .then(isOffline => {
+            setPersonas(prev => prev.map(p => p.id === personaId ? { ...p, isOffline } : p));
+          })
+          .catch(() => {});
+      }
+    } catch (error: any) {
+      const errorMsgText = error?.message || "";
+      if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED")) {
+        setLastApiErrorTime(Date.now());
+      }
       console.error("Failed to generate reply:", error);
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -1608,6 +1651,8 @@ export default function App() {
                     onPlayPause={handlePlayPause}
                     onNext={handleNextSong}
                     onPrev={handlePrevSong}
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
                   />
                 </motion.div>
               )}
