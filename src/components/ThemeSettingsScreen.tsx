@@ -158,7 +158,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
   };
 
   return (
-    <div className="w-full h-full bg-neutral-50 flex flex-col pt-12">
+    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
       {isReadingFile && (
         <div className="fixed inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />

@@ -5,7 +5,7 @@ import {
   ListMusic, Plus, Share, MoreHorizontal, Music, Trash2, FolderPlus, Folder, Users, X, Heart,
   Minimize2, Maximize2, Image as ImageIcon
 } from 'lucide-react';
-import { Song, Persona, Playlist, Message, ApiSettings, WorldbookSettings, UserProfile } from '../types';
+import { Song, Persona, Playlist, Message, ApiSettings, WorldbookSettings, UserProfile, ThemeSettings } from '../types';
 import { fetchAiResponse } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
 
@@ -40,6 +40,7 @@ interface MusicScreenProps {
   apiSettings?: ApiSettings;
   worldbook?: WorldbookSettings;
   aiRef?: React.MutableRefObject<GoogleGenAI | null>;
+  theme: ThemeSettings;
 }
 
 const defaultCover = 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=800&q=80';
@@ -74,7 +75,8 @@ export function MusicScreen({
   setMessages,
   apiSettings,
   worldbook,
-  aiRef
+  aiRef,
+  theme
 }: MusicScreenProps) {
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -542,7 +544,7 @@ export function MusicScreen({
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/20 via-[#0a0a0a]/80 to-[#0a0a0a]" />
 
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between px-6 pb-2 pt-12 shrink-0">
+      <div className={`relative z-10 flex items-center justify-between px-6 pb-2 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button 
           onClick={onBack}
           className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"

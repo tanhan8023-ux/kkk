@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, BookOpen, Download, Upload, Users, Image as ImageIcon, RefreshCw } from 'lucide-react';
-import { WorldbookSettings, Persona, ApiSettings, UserProfile } from '../types';
+import { WorldbookSettings, Persona, ApiSettings, UserProfile, ThemeSettings } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { fetchAiResponse } from '../services/aiService';
 
@@ -12,9 +12,10 @@ interface Props {
   aiRef: React.MutableRefObject<GoogleGenAI | null>;
   onSave: (worldbook: WorldbookSettings, personas: Persona[]) => void;
   onBack: () => void;
+  theme: ThemeSettings;
 }
 
-export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPersonas, apiSettings, userProfile, aiRef, onSave, onBack }: Props) {
+export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPersonas, apiSettings, userProfile, aiRef, onSave, onBack, theme }: Props) {
   const [worldbook, setWorldbook] = useState<WorldbookSettings>(initialWorldbook);
   const [personas, setPersonas] = useState<Persona[]>(initialPersonas);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -132,7 +133,7 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
   };
 
   return (
-    <div className="w-full h-full bg-neutral-50 flex flex-col pt-12">
+    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
       <div className="h-12 flex items-center justify-between px-2 bg-white border-b border-neutral-200 shrink-0">
         <button onClick={handleBack} className="text-blue-500 p-2 active:opacity-70 flex items-center">
           <ChevronLeft size={24} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Heart, MessageCircle, Send, RefreshCw, Plus, X, Bell, UserPlus, Trash2, Reply, RotateCcw, Copy } from 'lucide-react';
-import { TreeHolePost, Persona, UserProfile, ApiSettings, WorldbookSettings, TreeHoleComment, TreeHoleNotification, TreeHoleMessage } from '../types';
+import { TreeHolePost, Persona, UserProfile, ApiSettings, WorldbookSettings, TreeHoleComment, TreeHoleNotification, TreeHoleMessage, ThemeSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAiResponse } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
@@ -20,6 +20,7 @@ interface Props {
   onAddWechat: (npcId: string, npcName: string, npcAvatar: string, intro?: string) => void;
   privateChats: Record<string, TreeHoleMessage[]>;
   setPrivateChats: React.Dispatch<React.SetStateAction<Record<string, TreeHoleMessage[]>>>;
+  theme: ThemeSettings;
 }
 
 const RANDOM_NAMES = ['匿名小猫', '忧郁的云', '深海里的鱼', '夜行者', '不知名的路人', '星空下的梦', '流浪的诗人', '午后的红茶', '月光下的猫', '孤独的旅人'];
@@ -44,7 +45,7 @@ const RANDOM_COMMENTS = [
   '哈哈哈哈', '确实', '太真实了', '扎心了老铁', '围观', '不明觉厉'
 ];
 
-export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notifications, setNotifications, apiSettings, worldbook, aiRef, onBack, onStartChat, onAddWechat, privateChats, setPrivateChats }: Props) {
+export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notifications, setNotifications, apiSettings, worldbook, aiRef, onBack, onStartChat, onAddWechat, privateChats, setPrivateChats, theme }: Props) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeChatNpcInfo, setActiveChatNpcInfo] = useState<{id: string, name: string, avatar: string} | null>(null);
   const [messageText, setMessageText] = useState('');
@@ -381,6 +382,7 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
   };
 
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [revealedRecalledIds, setRevealedRecalledIds] = useState<string[]>([]);
   const [replyToMessage, setReplyToMessage] = useState<TreeHoleMessage | null>(null);
 
   const handleDeleteMessage = (msgId: string) => {
@@ -408,7 +410,7 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
     setPrivateChats(prev => ({
       ...prev,
       [activeChatNpcInfo.id]: prev[activeChatNpcInfo.id].map(m => 
-        m.id === msgId ? { ...m, isRecalled: true, text: '撤回了一条消息' } : m
+        m.id === msgId ? { ...m, isRecalled: true } : m
       )
     }));
     setActiveMessageId(null);
@@ -617,7 +619,7 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
   }, [viewMode, messageTab]);
 
   return (
-    <div className="w-full h-full bg-neutral-50 flex flex-col overflow-hidden relative pt-12">
+    <div className={`w-full h-full bg-neutral-50 flex flex-col overflow-hidden relative ${theme.showStatusBar !== false ? 'pt-14' : ''}`}>
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-neutral-100 shrink-0">
         <div className="flex items-center gap-3">
@@ -951,7 +953,7 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute inset-0 z-50 bg-neutral-50 flex flex-col pt-12"
+            className={`absolute inset-0 z-50 bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}
           >
             <div className="bg-white px-4 py-3 flex items-center gap-3 border-b border-neutral-100 shrink-0">
               <button onClick={() => setActiveChatNpcInfo(null)} className="p-1 -ml-1">
@@ -969,14 +971,25 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
                 // Check for wxid_ pattern
                 const wxidMatch = msg.text.match(/wxid_[a-zA-Z0-9]+/);
                 const hasWxid = !!wxidMatch;
-                const isRecalled = msg.isRecalled;
+                const isRecalled = msg.isRecalled && !revealedRecalledIds.includes(msg.id || '');
                 
                 return (
                   <div key={msg.id || i} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'} relative group`}>
                     {isRecalled ? (
-                       <div className="text-xs text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full self-center my-1">
-                         {msg.isMe ? '你' : '对方'}撤回了一条消息
-                       </div>
+                        <div 
+                          className="text-xs text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full self-center my-1 cursor-pointer active:opacity-70"
+                          onClick={() => {
+                            if (msg.id) {
+                              if (revealedRecalledIds.includes(msg.id)) {
+                                setRevealedRecalledIds(prev => prev.filter(id => id !== msg.id));
+                              } else {
+                                setRevealedRecalledIds(prev => [...prev, msg.id]);
+                              }
+                            }
+                          }}
+                        >
+                          {msg.isMe ? '你' : '对方'}撤回了一条消息 (点击{msg.id && revealedRecalledIds.includes(msg.id) ? '隐藏' : '查看'})
+                        </div>
                     ) : (
                       <>
                         <div 
@@ -1012,10 +1025,15 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
                                </button>
                              </div>
                            ) : (
-                             <div className={`p-3 rounded-2xl text-sm break-words ${
+                             <div className={`p-3 rounded-2xl text-sm break-words relative ${
                                msg.isMe ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-white text-neutral-800 rounded-tl-none shadow-sm'
-                             }`}>
+                             } ${msg.isRecalled ? 'opacity-80' : ''}`}>
                                {msg.text}
+                               {msg.isRecalled && (
+                                 <div className="text-[10px] opacity-50 mt-1 flex items-center gap-1">
+                                   <RotateCcw size={10} /> 已撤回的消息
+                                 </div>
+                               )}
                              </div>
                            )}
 

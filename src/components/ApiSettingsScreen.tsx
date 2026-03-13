@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Settings, Plus, Trash2, Image as ImageIcon, Download, Upload } from 'lucide-react';
-import { ApiSettings, Persona, UserProfile } from '../types';
+import { ApiSettings, Persona, UserProfile, ThemeSettings } from '../types';
 
 interface Props {
   settings: ApiSettings;
@@ -8,9 +8,10 @@ interface Props {
   userProfile: UserProfile;
   onSave: (settings: ApiSettings, personas: Persona[], userProfile: UserProfile) => void;
   onBack: () => void;
+  theme: ThemeSettings;
 }
 
-export function ApiSettingsScreen({ settings, personas: initialPersonas, userProfile: initialUserProfile, onSave, onBack }: Props) {
+export function ApiSettingsScreen({ settings, personas: initialPersonas, userProfile: initialUserProfile, onSave, onBack, theme }: Props) {
   const [apiUrl, setApiUrl] = useState(settings.apiUrl);
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
@@ -266,7 +267,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   };
 
   return (
-    <div className="w-full h-full bg-neutral-50 flex flex-col pt-12">
+    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
       <div className="h-12 flex items-center justify-between px-2 bg-white border-b border-neutral-200 shrink-0">
         <button onClick={handleBack} className="text-blue-500 p-2 active:opacity-70 flex items-center">
           <ChevronLeft size={24} />

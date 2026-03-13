@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Search, ShoppingCart, MessageCircle, Star, ChevronRight, CheckCircle2, Share } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserProfile, Transaction, Persona } from '../types';
+import { UserProfile, Transaction, Persona, ThemeSettings } from '../types';
 
 interface Props {
   userProfile: UserProfile;
@@ -9,6 +9,7 @@ interface Props {
   onBack: () => void;
   personas: Persona[];
   onShare: (productId: string, personaId: string) => void;
+  theme: ThemeSettings;
 }
 
 const PRODUCTS = [
@@ -46,7 +47,7 @@ const PRODUCTS = [
   }
 ];
 
-export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, onShare }: Props) {
+export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, onShare, theme }: Props) {
   const [selectedProduct, setSelectedProduct] = useState<typeof PRODUCTS[0] | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -101,7 +102,7 @@ export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, on
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
     >
       {/* Header */}
-      <div className="bg-[#ff5000] px-4 pt-12 pb-3 flex items-center gap-3 shrink-0">
+      <div className={`bg-[#ff5000] px-4 pb-3 flex items-center gap-3 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={onBack} className="p-1 -ml-1 text-white">
           <ArrowLeft className="w-6 h-6" />
         </button>

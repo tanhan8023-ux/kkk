@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Search, Star, Clock, MapPin, ShoppingCart, User, Home, List, Heart, Filter, ChevronRight, Plus, Minus, X, Phone, MessageSquare, ShoppingBag, Truck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Persona, Order, UserProfile } from '../types';
+import { Persona, Order, UserProfile, ThemeSettings } from '../types';
 
 interface Restaurant {
   id: string;
@@ -305,7 +305,7 @@ const CATEGORIES = [
   { name: '跑腿', icon: '🏃', color: 'bg-yellow-100' },
 ];
 
-export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, orders, userProfile, setUserProfile }: { 
+export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, orders, userProfile, setUserProfile, theme }: { 
   onBack: () => void;
   personas: Persona[];
   onOrder: (items: string[], forWho: string) => void;
@@ -313,6 +313,7 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
   orders: Order[];
   userProfile: UserProfile;
   setUserProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
+  theme: ThemeSettings;
 }) {
   const [activeTab, setActiveTab] = useState<'home' | 'order' | 'mine'>('home');
   const [searchQuery, setSearchQuery] = useState('');
@@ -520,7 +521,7 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
   return (
     <div className="w-full h-full bg-[#f4f4f4] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white px-4 pt-12 pb-3 shrink-0">
+      <div className={`bg-white px-4 pb-3 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1 text-neutral-800 font-bold flex-1 mr-4">
             <MapPin size={18} className="text-blue-500 shrink-0" />

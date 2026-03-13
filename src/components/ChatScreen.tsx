@@ -98,6 +98,7 @@ export function ChatScreen({
     onAiPhoneToggle?.(showAiPhone);
   }, [showAiPhone, onAiPhoneToggle]);
   const [activeMessageMenu, setActiveMessageMenu] = useState<string | null>(null);
+  const [revealedRecalledIds, setRevealedRecalledIds] = useState<string[]>([]);
   const [quotedMessage, setQuotedMessage] = useState<Message | null>(null);
   const [showTheaterSettings, setShowTheaterSettings] = useState(false);
   const [theaterSettings, setTheaterSettings] = useState({
@@ -2005,7 +2006,7 @@ ${recentMessages}
   };
 
   return (
-    <div className="w-full h-full bg-neutral-100 flex flex-col pt-12">
+    <div className={`w-full h-full bg-neutral-100 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : ''}`}>
       {/* Header */}
       <div className="h-12 flex items-center px-2 bg-neutral-100 border-b border-neutral-200 shrink-0 z-[70]">
         {activeTab === 'chat' && currentChatId ? (
@@ -2317,11 +2318,20 @@ ${recentMessages}
                 </div>
               )}
               {currentMessages.slice(-100).map((msg) => {
-                if (msg.isRecalled) {
+                if (msg.isRecalled && !revealedRecalledIds.includes(msg.id)) {
                   return (
                     <div key={msg.id} className="flex justify-center my-2">
-                      <span className="text-[12px] text-neutral-400 bg-neutral-200/50 px-2 py-1 rounded-md">
-                        {msg.role === 'user' ? '你' : currentPersona?.name}撤回了一条消息
+                      <span 
+                        className="text-[12px] text-neutral-400 bg-neutral-200/50 px-2 py-1 rounded-md cursor-pointer active:opacity-70"
+                        onClick={() => {
+                          if (revealedRecalledIds.includes(msg.id)) {
+                            setRevealedRecalledIds(prev => prev.filter(id => id !== msg.id));
+                          } else {
+                            setRevealedRecalledIds(prev => [...prev, msg.id]);
+                          }
+                        }}
+                      >
+                        {msg.role === 'user' ? '你' : currentPersona?.name}撤回了一条消息 (点击{revealedRecalledIds.includes(msg.id) ? '隐藏' : '查看'})
                       </span>
                     </div>
                   );
@@ -2531,11 +2541,11 @@ ${recentMessages}
                         <>
                           {msg.text ? (
                             <div 
-                              className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed shadow-sm ${
+                              className={`rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed shadow-sm relative ${
                                 msg.role === 'user' 
                                   ? 'rounded-tr-sm custom-bubble-user' 
                                   : 'rounded-tl-sm custom-bubble-ai'
-                              } ${msg.isInnerVoice ? 'custom-inner-voice' : ''}`}
+                              } ${msg.isInnerVoice ? 'custom-inner-voice' : ''} ${msg.isRecalled ? 'opacity-80' : ''}`}
                               style={msg.isInnerVoice ? {
                                 backgroundColor: '#f5f5f5',
                                 color: '#666666',
@@ -2612,6 +2622,11 @@ ${recentMessages}
                                   </div>
                                 );
                               })()}
+                              {msg.isRecalled && (
+                                <div className="text-[10px] opacity-50 mt-1 flex items-center gap-1">
+                                  <RotateCcw size={10} /> 已撤回的消息
+                                </div>
+                              )}
                               {msg.msgType === 'sticker' && msg.sticker && (
                                 <div className="mt-2">
                                   <img 
@@ -3828,7 +3843,7 @@ ${recentMessages}
         {activeTab === 'favorites' && (
           <div className="absolute inset-0 overflow-y-auto bg-neutral-100 pb-[80px]">
             {/* User Profile Header */}
-            <div className="bg-white px-6 pt-12 pb-8 mb-3 flex items-center gap-4">
+            <div className={`bg-white px-6 pb-8 mb-3 flex items-center gap-4 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
               <div className="relative shrink-0">
                 <img 
                   src={userProfile.avatarUrl || defaultUserAvatar} 
@@ -4188,7 +4203,7 @@ ${recentMessages}
                 </div>
 
                 {/* Header */}
-                <div className="pt-12 pb-4 flex items-center px-4 z-10 bg-gradient-to-b from-black/90 to-transparent">
+                <div className={`pb-4 flex items-center px-4 z-10 bg-gradient-to-b from-black/90 to-transparent ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
                   <button onClick={() => setActiveTheaterScript(null)} className="text-white/80 p-2 hover:text-white transition-colors">
                     <ChevronLeft size={28} />
                   </button>
@@ -5105,6 +5120,7 @@ ${recentMessages}
             };
             setMessages(prev => [...prev, aiMsg]);
           }}
+          theme={theme}
         />
       )}
     </div>

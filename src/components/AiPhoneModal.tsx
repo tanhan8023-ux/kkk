@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Cpu, HardDrive, Wifi, Battery, Search, MessageSquare, Lock, Terminal, Home, ChevronLeft, User, Settings, FileText, Phone as PhoneIcon, Camera, Mail, Smartphone, ArrowLeft, Book, Loader2, Plus } from 'lucide-react';
-import { Persona, Message, UserProfile, ApiSettings, WorldbookSettings, DiaryEntry } from '../types';
+import { Persona, Message, UserProfile, ApiSettings, WorldbookSettings, DiaryEntry, ThemeSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { GoogleGenAI } from '@google/genai';
@@ -14,11 +14,12 @@ interface AiPhoneModalProps {
   userProfile: UserProfile;
   apiSettings: ApiSettings;
   worldbook: WorldbookSettings;
+  theme: ThemeSettings;
 }
 
 type AppScreen = 'home' | 'wechat' | 'contacts' | 'notes' | 'settings' | 'chat-detail' | 'wallpaper-settings' | 'icon-settings' | 'diary';
 
-export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, onSendMessageAsAi, userProfile, apiSettings, worldbook }: AiPhoneModalProps) {
+export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, onSendMessageAsAi, userProfile, apiSettings, worldbook, theme }: AiPhoneModalProps) {
   const [activeScreen, setActiveScreen] = useState<AppScreen>('home');
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [time, setTime] = useState(new Date());
@@ -286,7 +287,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderWeChatList = () => (
     <div className="flex flex-col h-full bg-[#ededed] text-black">
-      <div className="px-4 pt-12 pb-2 flex items-center justify-between bg-[#ededed]">
+      <div className={`px-4 pb-2 flex items-center justify-between bg-[#ededed] ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <div className="flex items-center gap-1">
           <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
@@ -365,7 +366,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
     return (
       <div className="flex flex-col h-full bg-[#f5f5f5] text-black">
-        <div className="px-4 pt-12 pb-3 border-b border-gray-200 flex items-center justify-between bg-[#ededed]">
+        <div className={`px-4 pb-3 border-b border-gray-200 flex items-center justify-between bg-[#ededed] ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
           <button onClick={() => setActiveScreen('wechat')} className="text-black active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
           </button>
@@ -428,7 +429,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderDiaryScreen = () => (
     <div className="flex flex-col h-full bg-[#fdfaf2] text-black">
-      <div className="px-4 pt-12 pb-4 flex items-center justify-between bg-[#fdfaf2] border-b border-orange-100">
+      <div className={`px-4 pb-4 flex items-center justify-between bg-[#fdfaf2] border-b border-orange-100 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
           <ChevronLeft size={24} className="text-orange-800" />
         </button>
@@ -471,7 +472,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderContacts = () => (
     <div className="flex flex-col h-full bg-[#ededed] text-black">
-      <div className="px-4 pt-12 pb-2 flex items-center justify-between bg-[#ededed] relative">
+      <div className={`px-4 pb-2 flex items-center justify-between bg-[#ededed] relative ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <div className="flex items-center gap-1">
           <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
@@ -542,7 +543,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderNotes = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className="px-4 pt-12 pb-2 flex items-center justify-between">
+      <div className={`px-4 pb-2 flex items-center justify-between ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setActiveScreen('home')} className="text-blue-500 flex items-center gap-1 text-[17px]">
           <ChevronLeft size={24} />
           <span>返回</span>
@@ -569,7 +570,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className="px-4 pt-12 pb-2 flex items-center gap-2 bg-white/80 backdrop-blur-md border-b border-gray-200">
+      <div className={`px-4 pb-2 flex items-center gap-2 bg-white/80 backdrop-blur-md border-b border-gray-200 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setActiveScreen('home')} className="text-blue-500 p-1 -ml-1 active:opacity-50 transition-opacity">
           <ChevronLeft size={24} />
         </button>
@@ -642,7 +643,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderWallpaperSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className="p-4 pt-12 flex items-center gap-4 border-b bg-white">
+      <div className={`p-4 flex items-center gap-4 border-b bg-white ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setActiveScreen('settings')} className="text-blue-500">
           <ChevronLeft size={24} />
         </button>
@@ -685,7 +686,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderIconSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className="p-4 pt-12 flex items-center gap-4 border-b bg-white">
+      <div className={`p-4 flex items-center gap-4 border-b bg-white ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setActiveScreen('settings')} className="text-blue-500">
           <ChevronLeft size={24} />
         </button>

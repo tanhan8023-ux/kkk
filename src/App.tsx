@@ -1677,6 +1677,7 @@ export default function App() {
                       setPersonas(newPersonas);
                     }} 
                     onBack={() => setCurrentScreen('home')} 
+                    theme={theme}
                   />
                 </motion.div>
               )}
@@ -1700,6 +1701,7 @@ export default function App() {
                       setUserProfile(newUserProfile);
                     }} 
                     onBack={() => setCurrentScreen('home')} 
+                    theme={theme}
                   />
                 </motion.div>
               )}
@@ -1763,6 +1765,7 @@ export default function App() {
                     apiSettings={apiSettings}
                     worldbook={worldbook}
                     aiRef={aiRef}
+                    theme={theme}
                   />
                 </motion.div>
               )}
@@ -1794,6 +1797,7 @@ export default function App() {
                     aiRef={aiRef}
                     onBack={() => setCurrentScreen('home')} 
                     messages={messages}
+                    theme={theme}
                   />
                 </motion.div>
               )}
@@ -1840,6 +1844,7 @@ export default function App() {
                     setUserProfile={setUserProfile}
                     onBack={() => setCurrentScreen('home')}
                     personas={personas}
+                    theme={theme}
                     onShare={(productId, personaId) => {
                       const product = [
                         {
@@ -1926,6 +1931,7 @@ export default function App() {
                     onOrder={handleOrder}
                     userProfile={userProfile}
                     setUserProfile={setUserProfile}
+                    theme={theme}
                   />
                 </motion.div>
               )}
@@ -1947,6 +1953,7 @@ export default function App() {
                     setMessages={setMessages}
                     userProfile={userProfile}
                     worldbook={worldbook}
+                    theme={theme}
                   />
                 </motion.div>
               )}

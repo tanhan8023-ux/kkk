@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, Heart, MessageCircle, Share2, Plus, User, Home, Search, Bookmark, ArrowLeft, Camera, Image as ImageIcon, X, Send, Compass, ShoppingBag } from 'lucide-react';
-import { XHSPost, Persona, UserProfile, ApiSettings, WorldbookSettings, Message } from '../types';
+import { XHSPost, Persona, UserProfile, ApiSettings, WorldbookSettings, Message, ThemeSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAiResponse } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
@@ -23,6 +23,7 @@ interface Props {
   aiRef: React.MutableRefObject<GoogleGenAI | null>;
   onBack: () => void;
   messages: Message[];
+  theme: ThemeSettings;
 }
 
 const MARKET_ITEMS = [
@@ -51,7 +52,8 @@ export function XHSScreen({
   worldbook,
   aiRef,
   onBack,
-  messages
+  messages,
+  theme
 }: Props) {
   const [activeTab, setActiveTab] = useState<'square' | 'market' | 'messages' | 'me'>('square');
   const [squareTab, setSquareTab] = useState<'following' | 'discover' | 'nearby'>('discover');
@@ -269,7 +271,7 @@ export function XHSScreen({
     : (meSubTab === 'posts' ? posts.filter(p => p.authorId === 'user') : posts.filter(p => p.isBookmarked));
 
   return (
-    <div className="w-full h-full bg-white flex flex-col relative overflow-hidden pt-10">
+    <div className={`w-full h-full bg-white flex flex-col relative overflow-hidden ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
       {/* Header */}
       <div className="h-12 flex items-center justify-between px-4 bg-white border-b border-neutral-100 shrink-0 z-10">
         <button onClick={onBack} className="text-neutral-600 active:opacity-70">

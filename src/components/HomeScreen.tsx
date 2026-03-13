@@ -968,7 +968,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
 
   return (
     <div 
-      className="w-full h-full pb-6 flex flex-col overflow-hidden relative"
+      className={`w-full h-full pb-6 flex flex-col overflow-hidden relative ${theme.showStatusBar !== false ? 'pt-14' : ''}`}
       onPointerDown={(e) => {
         // Only trigger on the background, not on children
         if (e.target === e.currentTarget) {

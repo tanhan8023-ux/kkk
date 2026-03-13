@@ -3,7 +3,7 @@ import { ChevronLeft, GlassWater, Wine, Beer, Coffee, IceCream, Sparkles, Send, 
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchAiResponse } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
-import { ApiSettings, Persona, Message, UserProfile, WorldbookSettings } from '../types';
+import { ApiSettings, Persona, Message, UserProfile, WorldbookSettings, ThemeSettings } from '../types';
 
 interface Props {
   onBack: () => void;
@@ -13,6 +13,7 @@ interface Props {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   userProfile: UserProfile;
   worldbook: WorldbookSettings;
+  theme: ThemeSettings;
 }
 
 interface Ingredient {
@@ -33,7 +34,7 @@ const INGREDIENTS: Ingredient[] = [
 
 type GameState = 'dice-roll' | 'mixing' | 'serving' | 'decision' | 'truth-or-dare' | 'answering' | 'drunk-event' | 'round-end' | 'user-asking';
 
-export function BartenderGame({ onBack, apiSettings, personas, messages, setMessages, userProfile, worldbook }: Props) {
+export function BartenderGame({ onBack, apiSettings, personas, messages, setMessages, userProfile, worldbook, theme }: Props) {
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(() => {
     const saved = localStorage.getItem('bartender_selectedPersonaId');
     return saved ? JSON.parse(saved) : null;
@@ -446,7 +447,7 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
   if (!selectedPersonaId) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 z-[100] flex flex-col">
-        <div className="pt-12 pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md">
+        <div className={`pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
           <button onClick={onBack} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
             <ChevronLeft size={24} />
           </button>
@@ -480,7 +481,7 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] text-slate-200 z-[100] flex flex-col font-sans">
       {/* Header */}
-      <div className="pt-12 pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-10 shadow-sm">
+      <div className={`pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-10 shadow-sm ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
         <button onClick={() => setSelectedPersonaId(null)} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
           <ChevronLeft size={24} />
         </button>
