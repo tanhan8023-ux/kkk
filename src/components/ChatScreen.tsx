@@ -1696,6 +1696,12 @@ export function ChatScreen({
     }
   };
 
+  const handleSendRef = useRef(handleSend);
+
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
+
   const handleCheckPhoneResponse = useCallback((msgId: string, accept: boolean) => {
     setMessages(prev => prev.map(m => 
       m.id === msgId ? { ...m, checkPhoneStatus: accept ? 'accepted' : 'rejected' } : m
@@ -1703,7 +1709,7 @@ export function ChatScreen({
     
     if (accept) {
       // Create a summary of recent messages to provide context
-      const recentMessages = messages.slice(-10).map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.text}`).join('\n');
+      const recentMessages = messagesRef.current.slice(-10).map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.text}`).join('\n');
       
       const systemPrompt = `[系统提示：用户允许了你查看TA的手机。
 这是你们最近的聊天记录：
@@ -1721,11 +1727,11 @@ ${recentMessages}
 5. 请务必使用 [ACTION:IMAGE:描述] 标签生成一张你看到的手机屏幕截图（例如：[ACTION:IMAGE:一张手机屏幕截图，显示着用户和一个叫小美的女生的微信聊天记录]），然后把截图发给用户并直接质问或评论。
 6. 如果你觉得没问题，也可以乖乖把手机还给用户，并根据你的人设撒娇或表达满意。]`;
       
-      handleSend(systemPrompt, 'system', undefined, undefined, undefined, undefined, undefined, undefined, true);
+      handleSendRef.current(systemPrompt, 'system', undefined, undefined, undefined, undefined, undefined, undefined, true);
     } else {
-      handleSend("[系统提示：用户拒绝了你查看TA手机的请求。请根据你的人设作出反应（例如：生气、怀疑、撒娇等）。]", 'system', undefined, undefined, undefined, undefined, undefined, undefined, true);
+      handleSendRef.current("[系统提示：用户拒绝了你查看TA手机的请求。请根据你的人设作出反应（例如：生气、怀疑、撒娇等）。]", 'system', undefined, undefined, undefined, undefined, undefined, undefined, true);
     }
-  }, [messages, handleSend]);
+  }, []);
 
   useEffect(() => {
     setPhoneResponseHandler(() => handleCheckPhoneResponse);
