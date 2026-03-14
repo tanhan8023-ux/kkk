@@ -271,7 +271,10 @@ export function XHSScreen({
     : (meSubTab === 'posts' ? posts.filter(p => p.authorId === 'user') : posts.filter(p => p.isBookmarked));
 
   return (
-    <div className={`w-full h-full bg-white flex flex-col relative overflow-hidden ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+    <div 
+      className={`w-full h-full bg-white flex flex-col relative overflow-hidden`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+    >
       {/* Header */}
       <div className="h-12 flex items-center justify-between px-4 bg-white border-b border-neutral-100 shrink-0 z-10">
         <button onClick={onBack} className="text-neutral-600 active:opacity-70">
@@ -317,7 +320,8 @@ export function XHSScreen({
         initial={{ opacity: 0, x: activeTab === 'me' ? 20 : (activeTab === 'square' ? -20 : 0) }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2 }}
-        className="flex-1 overflow-y-auto bg-neutral-50 pb-20"
+        className="flex-1 overflow-y-auto bg-neutral-50"
+        style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
       >
         {activeTab === 'square' && (
           <div className="grid grid-cols-2 gap-1.5 p-1.5">
@@ -613,7 +617,10 @@ export function XHSScreen({
                 <div className="border-t border-neutral-100 pt-4">
                   <h3 className="font-bold text-sm text-neutral-900 mb-4">共 {selectedPost.commentsList?.length || 0} 条评论</h3>
                   {selectedPost.commentsList && selectedPost.commentsList.length > 0 ? (
-                    <div className="space-y-4 pb-10">
+                    <div 
+                      className="space-y-4"
+                      style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
+                    >
                       {selectedPost.commentsList.map(comment => (
                         <div key={comment.id} className="flex gap-3">
                           <button 
@@ -773,7 +780,8 @@ export function XHSScreen({
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              className="w-full bg-white rounded-t-3xl p-6 pb-10 space-y-6"
+              className="w-full bg-white rounded-t-3xl p-6 space-y-6"
+              style={{ paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom))' }}
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-bold text-neutral-900">分享到</h3>

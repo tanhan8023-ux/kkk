@@ -343,7 +343,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
   };
 
   const renderHomeScreen = () => (
-    <div className="flex flex-col h-full justify-between pb-12">
+    <div 
+      className="flex flex-col h-full justify-between"
+      style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}
+    >
       <div className="grid grid-cols-4 gap-x-4 gap-y-8 p-6 pt-10">
         {[
           { id: 'wechat', icon: <MessageSquare className="text-white" />, label: "微信", color: "bg-[#07c160]" },
@@ -403,7 +406,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderWeChatList = () => (
     <div className="flex flex-col h-full bg-[#ededed] text-black">
-      <div className={`px-4 pb-2 flex items-center justify-between bg-[#ededed] ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`px-4 pb-2 flex items-center justify-between bg-[#ededed]`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center gap-1">
           <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
@@ -445,7 +451,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
         ))}
       </div>
       
-      <div className="h-[52px] border-t border-gray-200 bg-[#f7f7f7] flex items-center justify-around px-2 pb-1 text-[10px] font-medium text-gray-500">
+      <div 
+        className="border-t border-gray-200 bg-[#f7f7f7] flex items-center justify-around px-2 text-[10px] font-medium text-gray-500"
+        style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))', height: 'calc(52px + env(safe-area-inset-bottom))' }}
+      >
         <div className="flex flex-col items-center text-[#07c160] gap-0.5">
           <MessageSquare size={24} strokeWidth={2} />
           <span>微信</span>
@@ -482,7 +491,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
     return (
       <div className="flex flex-col h-full bg-[#f5f5f5] text-black">
-        <div className={`px-4 pb-3 border-b border-gray-200 flex items-center justify-between bg-[#ededed] ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+        <div 
+          className={`px-4 pb-3 border-b border-gray-200 flex items-center justify-between bg-[#ededed]`}
+          style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+        >
           <button onClick={() => setActiveScreen('wechat')} className="text-black active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
           </button>
@@ -522,7 +534,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
             </div>
           ))}
         </div>
-        <div className="p-2 pb-10 border-t border-gray-200 bg-[#f7f7f7] flex gap-2 items-center">
+        <div 
+          className="p-2 border-t border-gray-200 bg-[#f7f7f7] flex gap-2 items-center"
+          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+        >
           <div className="p-1.5 active:opacity-50 transition-opacity"><Terminal size={26} className="text-gray-700" /></div>
           <input 
             className="flex-1 bg-white rounded-md px-3 py-2 text-[15px] border border-gray-200 min-h-[36px] outline-none"
@@ -545,7 +560,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderDiaryScreen = () => (
     <div className="flex flex-col h-full bg-[#fdfaf2] text-black">
-      <div className={`px-4 pb-4 flex items-center justify-between bg-[#fdfaf2] border-b border-orange-100 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`px-4 pb-4 flex items-center justify-between bg-[#fdfaf2] border-b border-orange-100`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
           <ChevronLeft size={24} className="text-orange-800" />
         </button>
@@ -588,7 +606,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderContacts = () => (
     <div className="flex flex-col h-full bg-[#ededed] text-black">
-      <div className={`px-4 pb-2 flex items-center justify-between bg-[#ededed] relative ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`px-4 pb-2 flex items-center justify-between bg-[#ededed] relative`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center gap-1">
           <button onClick={() => setActiveScreen('home')} className="p-1 -ml-2 active:opacity-50 transition-opacity">
             <ChevronLeft size={24} />
@@ -634,7 +655,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
         ))}
       </div>
 
-      <div className="h-[52px] border-t border-gray-200 bg-[#f7f7f7] flex items-center justify-around px-2 pb-1 text-[10px] font-medium text-gray-500">
+      <div 
+        className="border-t border-gray-200 bg-[#f7f7f7] flex items-center justify-around px-2 text-[10px] font-medium text-gray-500"
+        style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom))', height: 'calc(52px + env(safe-area-inset-bottom))' }}
+      >
         <div className="flex flex-col items-center gap-0.5" onClick={() => setActiveScreen('wechat')}>
           <MessageSquare size={24} strokeWidth={2} />
           <span>微信</span>
@@ -659,7 +683,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderNotes = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className={`px-4 pb-2 flex items-center justify-between ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`px-4 pb-2 flex items-center justify-between`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setActiveScreen('home')} className="text-blue-500 flex items-center gap-1 text-[17px]">
           <ChevronLeft size={24} />
           <span>返回</span>
@@ -677,7 +704,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
           ))}
         </div>
       </div>
-      <div className="mt-auto p-4 border-t border-gray-200 bg-white/80 backdrop-blur-md flex justify-between items-center text-blue-500 pb-10">
+      <div 
+        className="mt-auto p-4 border-t border-gray-200 bg-white/80 backdrop-blur-md flex justify-between items-center text-blue-500"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         <span className="text-[13px] text-gray-400">{notes.length} 个备忘录</span>
         <FileText size={24} />
       </div>
@@ -686,7 +716,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className={`px-4 pb-2 flex items-center gap-2 bg-white/80 backdrop-blur-md border-b border-gray-200 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`px-4 pb-2 flex items-center gap-2 bg-white/80 backdrop-blur-md border-b border-gray-200`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setActiveScreen('home')} className="text-blue-500 p-1 -ml-1 active:opacity-50 transition-opacity">
           <ChevronLeft size={24} />
         </button>
@@ -759,7 +792,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderWallpaperSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className={`p-4 flex items-center gap-4 border-b bg-white ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`p-4 flex items-center gap-4 border-b bg-white`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setActiveScreen('settings')} className="text-blue-500">
           <ChevronLeft size={24} />
         </button>
@@ -802,7 +838,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const renderIconSettings = () => (
     <div className="flex flex-col h-full bg-[#F2F2F7] text-black">
-      <div className={`p-4 flex items-center gap-4 border-b bg-white ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`p-4 flex items-center gap-4 border-b bg-white`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setActiveScreen('settings')} className="text-blue-500">
           <ChevronLeft size={24} />
         </button>
@@ -842,7 +881,10 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-10">
+    <div 
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      style={{ paddingTop: 'calc(2.5rem + env(safe-area-inset-top))' }}
+    >
       {/* AI Thought Popup */}
       <AnimatePresence>
         {showThought && (

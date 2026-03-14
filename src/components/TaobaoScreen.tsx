@@ -102,7 +102,10 @@ export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, on
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
     >
       {/* Header */}
-      <div className={`bg-[#ff5000] px-4 pb-3 flex items-center gap-3 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`bg-[#ff5000] px-4 pb-3 flex items-center gap-3 shrink-0`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={onBack} className="p-1 -ml-1 text-white">
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -113,7 +116,10 @@ export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, on
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-6">
+      <div 
+        className="flex-1 overflow-y-auto no-scrollbar"
+        style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+      >
         {/* Banner */}
         <div className="p-3">
           <div className="w-full h-32 bg-gradient-to-r from-orange-400 to-[#ff5000] rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">
@@ -208,7 +214,10 @@ export function TaobaoScreen({ userProfile, setUserProfile, onBack, personas, on
           </div>
 
           {/* Bottom Action Bar */}
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-neutral-100 p-2 flex items-center gap-3 pb-8">
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-white border-t border-neutral-100 p-2 flex items-center gap-3"
+            style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+          >
             <div className="flex gap-4 px-2">
               <div className="flex flex-col items-center gap-1 text-neutral-500">
                 <MessageCircle className="w-5 h-5" />

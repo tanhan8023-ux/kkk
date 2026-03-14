@@ -1003,7 +1003,8 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
 
   return (
     <div 
-      className={`w-full h-full pb-6 flex flex-col overflow-hidden relative ${theme.showStatusBar !== false ? 'pt-14' : ''}`}
+      className={`w-full h-full pb-[env(safe-area-inset-bottom)] flex flex-col overflow-hidden relative`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)' }}
       onPointerDown={(e) => {
         // Only trigger on the background, not on children
         if (e.target === e.currentTarget) {
@@ -1193,7 +1194,8 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="absolute top-0 left-0 right-0 h-28 bg-white/50 backdrop-blur-xl z-[60] flex items-end justify-between px-6 pb-4 shadow-sm border-b border-white/40 pt-[env(safe-area-inset-top)]"
+            className="absolute top-0 left-0 right-0 bg-white/50 backdrop-blur-xl z-[60] flex items-end justify-between px-6 shadow-sm border-b border-white/40"
+            style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))', paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))', height: 'calc(7rem + env(safe-area-inset-top))' }}
           >
             <button onClick={() => setShowAddWidgetModal(true)} className="w-8 h-8 bg-black/10 rounded-full flex items-center justify-center text-neutral-800 active:scale-95 transition-transform">
               <Plus size={20} />

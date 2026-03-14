@@ -619,7 +619,10 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
   }, [viewMode, messageTab]);
 
   return (
-    <div className={`w-full h-full bg-neutral-50 flex flex-col overflow-hidden relative ${theme.showStatusBar !== false ? 'pt-14' : ''}`}>
+    <div 
+      className={`w-full h-full bg-neutral-50 flex flex-col overflow-hidden relative`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)' }}
+    >
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-neutral-100 shrink-0">
         <div className="flex items-center gap-3">

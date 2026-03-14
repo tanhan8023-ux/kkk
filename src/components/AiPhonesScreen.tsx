@@ -33,7 +33,10 @@ export function AiPhonesScreen({ onBack }: Props) {
   return (
     <div className="w-full h-full bg-black text-white flex flex-col font-mono overflow-hidden">
       {/* Status Bar */}
-      <div className="h-8 px-4 flex justify-between items-center text-[10px] text-green-400 border-b border-green-900/30 bg-black z-10 shrink-0">
+      <div 
+        className="px-4 flex justify-between items-center text-[10px] text-green-400 border-b border-green-900/30 bg-black z-10 shrink-0"
+        style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(2rem + env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center gap-2">
           <Wifi size={12} />
           <span>NEURAL_NET_5G</span>
@@ -118,7 +121,10 @@ export function AiPhonesScreen({ onBack }: Props) {
         </section>
 
         {/* Secret Notes */}
-        <section className="space-y-3 pb-8">
+        <section 
+          className="space-y-3"
+          style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+        >
           <h2 className="text-xs text-green-600 uppercase tracking-widest font-bold flex items-center gap-2">
             <FileText size={12} /> Encrypted Notes
           </h2>

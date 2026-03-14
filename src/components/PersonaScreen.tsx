@@ -133,7 +133,10 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
   };
 
   return (
-    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+    <div 
+      className={`w-full h-full bg-neutral-50 flex flex-col`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+    >
       <div className="h-12 flex items-center justify-between px-2 bg-white border-b border-neutral-200 shrink-0">
         <button onClick={handleBack} className="text-blue-500 p-2 active:opacity-70 flex items-center">
           <ChevronLeft size={24} />
@@ -177,7 +180,10 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
         </div>
       )}
 
-      <div className="flex-1 p-4 overflow-y-auto space-y-6 pb-12">
+      <div 
+        className="flex-1 p-4 overflow-y-auto space-y-6"
+        style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}
+      >
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-neutral-100 space-y-6">
           <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
             <div className="flex items-center gap-2 text-neutral-700">

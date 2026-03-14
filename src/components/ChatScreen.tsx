@@ -38,6 +38,8 @@ interface Props {
   xhsPrivateChats?: Record<string, { text: string, isMe: boolean, time: number }[]>;
   onAiPhoneToggle?: (isOpen: boolean) => void;
   aiRef: React.MutableRefObject<GoogleGenAI | null>;
+  setAiPhoneRequest: (request: {msgId: string, personaId: string} | null) => void;
+  setPhoneResponseHandler: (handler: ((msgId: string, accept: boolean) => void) | null) => void;
 }
 
 import localforage from 'localforage';
@@ -68,7 +70,9 @@ export function ChatScreen({
   listeningWithPersonaId, currentSong, isPlaying, onMusicClick,
   xhsPrivateChats,
   onAiPhoneToggle,
-  aiRef
+  aiRef,
+  setAiPhoneRequest,
+  setPhoneResponseHandler
 }: Props) {
   const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'moments' | 'favorites' | 'theater'>('chat');
   const [showWallet, setShowWallet] = useState(false);
@@ -1186,6 +1190,10 @@ export function ChatScreen({
           };
           lastAiMsgId = aiMsg.id;
           setMessages(prev => [...prev, aiMsg]);
+          
+          if (part.msgType === 'checkPhoneRequest') {
+            setAiPhoneRequest({ msgId: aiMsg.id, personaId: currentPersona.id });
+          }
 
           // Record transaction for AI transfer (only if it's a refund, otherwise it's pending)
           if (part.msgType === 'transfer' && part.amount && part.isRefund) {
@@ -1719,6 +1727,17 @@ ${recentMessages}
     }
   };
 
+  const handleCheckPhoneResponseRef = useRef(handleCheckPhoneResponse);
+  
+  useEffect(() => {
+    handleCheckPhoneResponseRef.current = handleCheckPhoneResponse;
+  }, [handleCheckPhoneResponse]);
+
+  useEffect(() => {
+    setPhoneResponseHandler(() => (msgId, accept) => handleCheckPhoneResponseRef.current(msgId, accept));
+    return () => setPhoneResponseHandler(null);
+  }, [setPhoneResponseHandler]);
+
   const handleTransferClick = () => {
     setShowTransferModal(true);
   };
@@ -2009,7 +2028,10 @@ ${recentMessages}
   };
 
   return (
-    <div className={`w-full h-full bg-neutral-100 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : ''}`}>
+    <div 
+      className={`w-full h-full bg-neutral-100 flex flex-col`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)' }}
+    >
       {/* Header */}
       <div className="h-12 flex items-center px-2 bg-neutral-100 border-b border-neutral-200 shrink-0 z-[70]">
         {activeTab === 'chat' && currentChatId ? (
@@ -3514,7 +3536,7 @@ ${recentMessages}
                       type="number" 
                       value={relativeCardLimit}
                       onChange={(e) => setRelativeCardLimit(e.target.value)}
-                      className="flex-1 text-[32px] font-bold outline-none"
+                      className="flex-1 min-w-0 text-[32px] font-bold outline-none"
                       autoFocus
                     />
                   </div>

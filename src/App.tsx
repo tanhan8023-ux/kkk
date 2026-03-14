@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
+import { Phone as PhoneIcon } from 'lucide-react';
 import { Phone } from './components/Phone';
 import { HomeScreen } from './components/HomeScreen';
 import { PersonaScreen } from './components/PersonaScreen';
@@ -68,6 +69,8 @@ export default function App() {
   const generatingDiariesRef = useRef<Set<string>>(new Set());
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [aiPhoneRequest, setAiPhoneRequest] = useState<{msgId: string, personaId: string} | null>(null);
+  const [phoneResponseHandler, setPhoneResponseHandler] = useState<((msgId: string, accept: boolean) => void) | null>(null);
 
   // Wallet State
   const handleRecharge = (amount: number) => {
@@ -2055,6 +2058,8 @@ export default function App() {
                 >
                   <ChatScreen 
                     isActive={currentScreen === 'chat'}
+                    setAiPhoneRequest={setAiPhoneRequest}
+                    setPhoneResponseHandler={setPhoneResponseHandler}
                     unreadCount={unreadCount}
                     currentChatId={currentChatId}
                     setCurrentChatId={setCurrentChatId}
@@ -2091,6 +2096,51 @@ export default function App() {
               )}
             </AnimatePresence>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* AI Phone Request Modal */}
+      <AnimatePresence>
+        {aiPhoneRequest && (
+          <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                <PhoneIcon className="w-10 h-10 text-blue-500" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-neutral-900">AI 请求查看手机</h3>
+                <p className="text-neutral-500 text-sm">AI 想要查看您的手机内容，是否允许？</p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
+                    if (phoneResponseHandler && aiPhoneRequest) {
+                      phoneResponseHandler(aiPhoneRequest.msgId, false);
+                    }
+                    setAiPhoneRequest(null);
+                  }}
+                  className="flex-1 py-3 rounded-full bg-neutral-100 text-neutral-700 font-bold"
+                >
+                  拒绝
+                </button>
+                <button 
+                  onClick={() => {
+                    if (phoneResponseHandler && aiPhoneRequest) {
+                      phoneResponseHandler(aiPhoneRequest.msgId, true);
+                    }
+                    setAiPhoneRequest(null);
+                  }}
+                  className="flex-1 py-3 rounded-full bg-blue-500 text-white font-bold"
+                >
+                  允许
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </Phone>

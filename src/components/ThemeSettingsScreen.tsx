@@ -159,7 +159,10 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
   };
 
   return (
-    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+    <div 
+      className={`w-full h-full bg-neutral-50 flex flex-col`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+    >
       {isReadingFile && (
         <div className="fixed inset-0 z-[9999] bg-black/60 flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
@@ -209,7 +212,10 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
         </div>
       )}
 
-      <div className="flex-1 p-4 overflow-y-auto space-y-6 pb-12">
+      <div 
+        className="flex-1 p-4 overflow-y-auto space-y-6"
+        style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}
+      >
         
         {/* Wallpapers */}
         <div className="grid grid-cols-2 gap-4">

@@ -45,7 +45,8 @@ export function LockScreen({ onUnlock, theme, notification, personas }: Props) {
 
   return (
     <motion.div 
-      className="absolute inset-0 z-40 flex flex-col items-center pt-20 pb-12 text-neutral-800 overflow-hidden"
+      className="absolute inset-0 z-40 flex flex-col items-center text-neutral-800 overflow-hidden"
+      style={{ paddingTop: 'calc(5rem + env(safe-area-inset-top))', paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ y: '-100%', opacity: 0 }}

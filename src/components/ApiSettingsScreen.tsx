@@ -271,7 +271,10 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   };
 
   return (
-    <div className={`w-full h-full bg-neutral-50 flex flex-col ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+    <div 
+      className={`w-full h-full bg-neutral-50 flex flex-col`}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+    >
       <div className="h-12 flex items-center justify-between px-2 bg-white border-b border-neutral-200 shrink-0">
         <button onClick={handleBack} className="text-blue-500 p-2 active:opacity-70 flex items-center">
           <ChevronLeft size={24} />
@@ -322,7 +325,11 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
         </div>
       )}
 
-      <div className="flex-1 p-4 overflow-y-auto" ref={scrollContainerRef}>
+      <div 
+        className="flex-1 p-4 overflow-y-auto" 
+        ref={scrollContainerRef}
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+      >
         {/* User Settings */}
         <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-5 space-y-4 mb-4">
           <h2 className="text-[14px] font-semibold text-neutral-800 border-b border-neutral-100 pb-2">我的设定</h2>

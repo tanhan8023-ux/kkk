@@ -544,7 +544,10 @@ export function MusicScreen({
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/20 via-[#0a0a0a]/80 to-[#0a0a0a]" />
 
       {/* Header */}
-      <div className={`relative z-10 flex items-center justify-between px-6 pb-2 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`relative z-10 flex items-center justify-between px-6 pb-2 shrink-0`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button 
           onClick={onBack}
           className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
@@ -1123,7 +1126,10 @@ export function MusicScreen({
                   <ChevronDown className="w-6 h-6" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-2 pb-6">
+              <div 
+                className="flex-1 overflow-y-auto space-y-2"
+                style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+              >
                 {playlists.map(pl => (
                   <button 
                     key={pl.id}
@@ -1176,7 +1182,10 @@ export function MusicScreen({
                   <ChevronDown className="w-6 h-6" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-3 pb-6">
+              <div 
+                className="flex-1 overflow-y-auto space-y-3"
+                style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+              >
                 {personas.map(persona => (
                   <button 
                     key={persona.id}

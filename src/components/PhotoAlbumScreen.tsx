@@ -47,7 +47,10 @@ export function PhotoAlbumScreen({ onBack }: PhotoAlbumScreenProps) {
   return (
     <div className="w-full h-full bg-white flex flex-col relative overflow-hidden">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-neutral-100 bg-white/80 backdrop-blur-md z-10 shrink-0">
+      <div 
+        className="flex items-center justify-between px-4 border-b border-neutral-100 bg-white/80 backdrop-blur-md z-10 shrink-0"
+        style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+      >
         <button 
           onClick={onBack}
           className="w-10 h-10 flex items-center justify-center -ml-2 active:bg-neutral-100 rounded-full transition-colors text-neutral-700"

@@ -97,8 +97,8 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
         {/* Status Bar */}
         {(theme.showStatusBar !== false) && (
         <div 
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-14 flex items-center justify-between px-6 z-50 text-xs font-bold pointer-events-none pt-[env(safe-area-inset-top)]"
-          style={{ color: theme.statusColor || '#ffffff' }}
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] flex items-center justify-between px-6 z-50 text-xs font-bold pointer-events-none"
+          style={{ color: theme.statusColor || '#ffffff', paddingTop: 'calc(0.5rem + env(safe-area-inset-top))', height: 'calc(3.5rem + env(safe-area-inset-top))' }}
         >
           <span className="drop-shadow-md text-[13px]">{formatTime(time)}</span>
           
@@ -137,13 +137,13 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
         )}
 
         {/* Screen Content */}
-        <div className={`flex-1 relative z-10 overflow-hidden flex flex-col w-full max-w-[480px] mx-auto pt-[env(safe-area-inset-top)] ${theme.fontUrl ? 'theme-font' : ''}`}>
+        <div className={`flex-1 relative z-10 overflow-hidden flex flex-col w-full max-w-[480px] mx-auto ${theme.fontUrl ? 'theme-font' : ''}`}>
           {children}
         </div>
 
         {/* Home Indicator (Bottom Bar) */}
         {!theme.immersiveMode && !hideHomeIndicator && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1/3 h-1.5 bg-neutral-800/50 backdrop-blur-sm rounded-full z-50 cursor-pointer pb-2 mb-[env(safe-area-inset-bottom)]" onClick={onHomeClick}></div>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1/3 h-1.5 bg-neutral-800/50 backdrop-blur-sm rounded-full z-50 cursor-pointer" onClick={onHomeClick}></div>
         )}
       </div>
     </div>

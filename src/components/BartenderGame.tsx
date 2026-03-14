@@ -447,14 +447,20 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
   if (!selectedPersonaId) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 z-[100] flex flex-col">
-        <div className={`pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+        <div 
+          className={`pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md`}
+          style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+        >
           <button onClick={onBack} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
             <ChevronLeft size={24} />
           </button>
           <h1 className="flex-1 text-center font-medium text-slate-100 tracking-wide">选择游戏对象</h1>
           <div className="w-10" />
         </div>
-        <div className="flex-1 overflow-y-auto p-6">
+        <div 
+          className="flex-1 overflow-y-auto px-6 pt-6"
+          style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+        >
           <div className="grid grid-cols-2 gap-4">
             {personas.map(persona => (
               <button
@@ -481,7 +487,10 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] text-slate-200 z-[100] flex flex-col font-sans">
       {/* Header */}
-      <div className={`pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-10 shadow-sm ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-10 shadow-sm`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={() => setSelectedPersonaId(null)} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
           <ChevronLeft size={24} />
         </button>
@@ -539,7 +548,10 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
       </div>
 
       {/* Interaction Area */}
-      <div className="p-5 bg-white/5 backdrop-blur-2xl border-t border-white/10 shrink-0 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
+      <div 
+        className="p-5 bg-white/5 backdrop-blur-2xl border-t border-white/10 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+      >
         
         {/* Dice Roll Phase */}
         {gameState === 'dice-roll' && (

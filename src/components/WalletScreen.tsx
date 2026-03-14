@@ -22,7 +22,10 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ balance, transaction
 
   return (
     <div className="w-full h-full bg-neutral-100 flex flex-col">
-      <div className="p-4 bg-white flex items-center shadow-sm">
+      <div 
+        className="p-4 bg-white flex items-center shadow-sm"
+        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+      >
         <button onClick={onBack} className="p-2">
           <ArrowLeft size={24} />
         </button>

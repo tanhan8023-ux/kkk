@@ -437,7 +437,10 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
         </div>
 
         {/* Menu List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+        <div 
+          className="flex-1 overflow-y-auto p-4 space-y-6"
+          style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
+        >
           <div>
             <h3 className="font-bold text-lg mb-4">热销推荐</h3>
             <div className="space-y-4">
@@ -521,7 +524,10 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
   return (
     <div className="w-full h-full bg-[#f4f4f4] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className={`bg-white px-4 pb-3 shrink-0 ${theme.showStatusBar !== false ? 'pt-14' : 'pt-12'}`}>
+      <div 
+        className={`bg-white px-4 pb-3 shrink-0`}
+        style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
+      >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1 text-neutral-800 font-bold flex-1 mr-4">
             <MapPin size={18} className="text-blue-500 shrink-0" />
@@ -795,7 +801,10 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
     )}
 
         {activeTab === 'order' && (
-          <div className="p-4 h-full overflow-y-auto pb-24">
+          <div 
+            className="p-4 h-full overflow-y-auto"
+            style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
+          >
             {orders.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-neutral-400 space-y-2">
                 <ShoppingCart size={48} strokeWidth={1.5} />
@@ -929,7 +938,10 @@ export function FoodDeliveryScreen({ onBack, personas, onOrder, onDeleteOrder, o
       </div>
 
       {/* Bottom Nav */}
-      <div className="bg-white border-t border-neutral-100 px-6 py-2 flex items-center justify-around shrink-0 pb-8">
+      <div 
+        className="bg-white border-t border-neutral-100 px-6 py-2 flex items-center justify-around shrink-0"
+        style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
+      >
         <button 
           onClick={() => setActiveTab('home')}
           className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-blue-500' : 'text-neutral-400'}`}
