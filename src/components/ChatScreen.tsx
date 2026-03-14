@@ -3677,7 +3677,7 @@ ${recentMessages}
         {showTransferModal && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden flex flex-col">
-              <div className="bg-[#f39b3a] p-6 flex flex-col items-center justify-center text-white relative">
+              <div className="w-full bg-[#f39b3a] p-6 flex flex-col items-center justify-center text-white relative">
                 <button onClick={() => setShowTransferModal(false)} className="absolute top-4 left-4 text-white/80 active:text-white">
                   <ChevronLeft size={24} />
                 </button>
@@ -3686,7 +3686,7 @@ ${recentMessages}
                 </div>
                 <h3 className="text-[16px] font-medium">微转账给 {currentPersona?.name}</h3>
               </div>
-              <div className="p-6 flex flex-col gap-6">
+              <div className="w-full p-6 flex flex-col gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-[14px] text-neutral-500 font-medium">转账金额</label>
                   <div className="flex items-center border-b border-neutral-200 pb-2">
@@ -3695,14 +3695,14 @@ ${recentMessages}
                       type="number" 
                       value={transferAmount}
                       onChange={(e) => setTransferAmount(e.target.value)}
-                      className="flex-1 text-4xl font-medium outline-none bg-transparent"
+                      className="flex-1 min-w-0 text-4xl font-medium outline-none bg-transparent"
                       autoFocus
                     />
                   </div>
-                  <div className="text-[12px] text-neutral-500 flex justify-between">
-                    <span>当前零钱余额 ¥{(userProfile.balance || 0).toFixed(2)}</span>
+                  <div className="text-[12px] text-neutral-500 flex justify-between flex-wrap gap-1">
+                    <span className="truncate">当前零钱余额 ¥{(userProfile.balance || 0).toFixed(2)}</span>
                     {(userProfile.balance || 0) < Number(transferAmount) && (
-                      <span className="text-red-500">余额不足</span>
+                      <span className="text-red-500 whitespace-nowrap">余额不足</span>
                     )}
                   </div>
                 </div>
@@ -3715,7 +3715,7 @@ ${recentMessages}
                     onChange={(e) => setTransferNote(e.target.value)}
                     placeholder="20字以内"
                     maxLength={20}
-                    className="w-full border-b border-neutral-200 pb-2 outline-none text-[16px]"
+                    className="w-full min-w-0 border-b border-neutral-200 pb-2 outline-none text-[16px]"
                   />
                 </div>
 
