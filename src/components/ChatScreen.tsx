@@ -680,6 +680,8 @@ export function ChatScreen({
               }
             }
 
+            let lastAiMsg: Message | null = null;
+
             for (let i = 0; i < finalParts.length; i++) {
               const part = finalParts[i];
               const typingDelay = Math.min((part.text || '...').length * 50, 1500) + Math.random() * 500;
@@ -706,7 +708,15 @@ export function ChatScreen({
                 createdAt: Date.now(),
                 quotedMessageId: i === 0 ? aiQuotedId : undefined
               };
+
+              // Deduplication check
+              if (lastAiMsg && lastAiMsg.text === aiMsg.text && lastAiMsg.role === aiMsg.role) {
+                console.warn("Skipping duplicate AI message:", aiMsg.text);
+                continue;
+              }
+
               setMessages(prev => [...prev, aiMsg]);
+              lastAiMsg = aiMsg;
             }
           } catch (e: any) {
             if (e?.message?.includes('频率限制') || e?.message?.includes('429')) {
