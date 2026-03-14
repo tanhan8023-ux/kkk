@@ -627,7 +627,12 @@ export async function fetchAiResponse(
     const stickerMatch = responseText.match(/\[STICKER:\s*([^\]]+)\]/i);
     if (stickerMatch) {
       const stickerPrompt = stickerMatch[1].trim();
-      if (!stickerPrompt.startsWith('http') && !stickerPrompt.startsWith('data:')) {
+      
+      // Check custom stickers first
+      const customSticker = userProfile.stickers?.find(s => s.name === stickerPrompt);
+      if (customSticker) {
+        responseText = responseText.replace(stickerMatch[0], `[STICKER: ${customSticker.url}]`);
+      } else if (!stickerPrompt.startsWith('http') && !stickerPrompt.startsWith('data:')) {
          try {
            const apiKey = effectiveApiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string;
            const imageUrl = await generateImage(stickerPrompt, apiKey);
@@ -641,7 +646,12 @@ export async function fetchAiResponse(
     const imageMatch = responseText.match(/\[ACTION:IMAGE:\s*([^\]]+)\]/i);
     if (imageMatch) {
       const imagePrompt = imageMatch[1].trim();
-      if (!imagePrompt.startsWith('http') && !imagePrompt.startsWith('data:')) {
+      
+      // Check custom stickers first
+      const customSticker = userProfile.stickers?.find(s => s.name === imagePrompt);
+      if (customSticker) {
+        responseText = responseText.replace(imageMatch[0], `[STICKER: ${customSticker.url}]`);
+      } else if (!imagePrompt.startsWith('http') && !imagePrompt.startsWith('data:')) {
          try {
            const apiKey = effectiveApiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string;
            const imageUrl = await generateImage(imagePrompt, apiKey);
@@ -715,7 +725,12 @@ export async function fetchAiResponse(
     const stickerMatch = responseText.match(/\[STICKER:\s*([^\]]+)\]/i);
     if (stickerMatch) {
       const stickerPrompt = stickerMatch[1].trim();
-      if (!stickerPrompt.startsWith('http') && !stickerPrompt.startsWith('data:')) {
+      
+      // Check custom stickers first
+      const customSticker = userProfile.stickers?.find(s => s.name === stickerPrompt);
+      if (customSticker) {
+        responseText = responseText.replace(stickerMatch[0], `[STICKER: ${customSticker.url}]`);
+      } else if (!stickerPrompt.startsWith('http') && !stickerPrompt.startsWith('data:')) {
          try {
            const apiKey = effectiveApiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string;
            const imageUrl = await generateImage(stickerPrompt, apiKey);
@@ -729,7 +744,12 @@ export async function fetchAiResponse(
     const imageMatch = responseText.match(/\[ACTION:IMAGE:\s*([^\]]+)\]/i);
     if (imageMatch) {
       const imagePrompt = imageMatch[1].trim();
-      if (!imagePrompt.startsWith('http') && !imagePrompt.startsWith('data:')) {
+      
+      // Check custom stickers first
+      const customSticker = userProfile.stickers?.find(s => s.name === imagePrompt);
+      if (customSticker) {
+        responseText = responseText.replace(imageMatch[0], `[STICKER: ${customSticker.url}]`);
+      } else if (!imagePrompt.startsWith('http') && !imagePrompt.startsWith('data:')) {
          try {
            const apiKey = effectiveApiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string;
            const imageUrl = await generateImage(imagePrompt, apiKey);

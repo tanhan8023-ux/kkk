@@ -97,7 +97,7 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
         {/* Status Bar */}
         {(theme.showStatusBar !== false) && (
         <div 
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-14 flex items-center justify-between px-6 z-50 text-xs font-bold pointer-events-none pt-2"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-14 flex items-center justify-between px-6 z-50 text-xs font-bold pointer-events-none pt-[env(safe-area-inset-top)]"
           style={{ color: theme.statusColor || '#ffffff' }}
         >
           <span className="drop-shadow-md text-[13px]">{formatTime(time)}</span>
@@ -137,7 +137,7 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
         )}
 
         {/* Screen Content */}
-        <div className={`flex-1 relative z-10 overflow-hidden flex flex-col w-full max-w-[480px] mx-auto ${theme.fontUrl ? 'theme-font' : ''}`}>
+        <div className={`flex-1 relative z-10 overflow-hidden flex flex-col w-full max-w-[480px] mx-auto pt-[env(safe-area-inset-top)] ${theme.fontUrl ? 'theme-font' : ''}`}>
           {children}
         </div>
 

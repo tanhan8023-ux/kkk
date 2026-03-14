@@ -24,7 +24,35 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [time, setTime] = useState(new Date());
   const [inputText, setInputText] = useState('');
+  const [aiThought, setAiThought] = useState<string | null>(null);
+  const [showThought, setShowThought] = useState(false);
   const aiRef = useRef<GoogleGenAI | null>(null);
+
+  useEffect(() => {
+    if (activeScreen !== 'home') {
+      generateAiThought(activeScreen);
+    }
+  }, [activeScreen]);
+
+  const generateAiThought = async (screen: AppScreen) => {
+    if (!aiRef.current) {
+      aiRef.current = new GoogleGenAI({ apiKey: apiSettings.apiKey || process.env.GEMINI_API_KEY as string });
+    }
+    
+    const prompt = `你现在是 ${persona.name}，用户正在查看你的手机中的 ${screen} 页面。请用一句话简短地表达你此时的想法或心情，语气要符合你的人设。`;
+    
+    try {
+      const response = await aiRef.current.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+      setAiThought(response.text || "...");
+      setShowThought(true);
+      setTimeout(() => setShowThought(false), 5000);
+    } catch (e) {
+      console.error("Failed to generate AI thought:", e);
+    }
+  };
   
   const defaultWallpaper = React.useMemo(() => {
     if (persona.mood?.includes('郁') || persona.mood?.includes('难过')) {
@@ -55,7 +83,11 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   // Generate persona-specific content
   const { contacts, messages, notes } = React.useMemo(() => {
-    const isCatGirl = persona.name.includes('猫') || persona.instructions.includes('猫');
+    const instructions = persona.instructions || '';
+    const name = persona.name || '';
+    const isCat = name.includes('猫') || instructions.includes('猫') || instructions.includes('cat');
+    const isTech = instructions.includes('程序员') || instructions.includes('代码') || instructions.includes('技术') || instructions.includes('code');
+    const isProfessional = instructions.includes('御姐') || instructions.includes('高冷') || instructions.includes('职场') || instructions.includes('专业');
     
     // User as a contact
     const userContact = { 
@@ -68,15 +100,32 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
     const baseContacts: any[] = [userContact];
 
-    const personaContacts = isCatGirl ? [
-      { id: 4, name: "小鱼干供应商", role: "后勤", avatar: "https://picsum.photos/seed/fish/100/100", status: "[在线] 刚进了一批顶级三文鱼" },
-      { id: 5, name: "隔壁的小黑", role: "玩伴", avatar: "https://picsum.photos/seed/cat2/100/100", status: "[离线] 正在晒太阳" },
-      { id: 6, name: "猫薄荷研究员", role: "专家", avatar: "https://picsum.photos/seed/mint/100/100", status: "[在线] 实验结果非常惊人" },
-    ] : [
-      { id: 4, name: "Midjourney", role: "艺术家", avatar: "https://picsum.photos/seed/mj/100/100", status: "[忙碌] 正在生成 4K 杰作" },
-      { id: 5, name: "Sora", role: "导演", avatar: "https://picsum.photos/seed/sora/100/100", status: "[在线] 视频渲染中..." },
-      { id: 6, name: "AutoGPT", role: "执行官", avatar: "https://picsum.photos/seed/autogpt/100/100", status: "[在线] 任务队列已满" },
-    ];
+    let personaContacts: any[] = [];
+    if (isCat) {
+      personaContacts = [
+        { id: 4, name: "小鱼干供应商", role: "后勤", avatar: "https://picsum.photos/seed/fish/100/100", status: "[在线] 刚进了一批顶级三文鱼" },
+        { id: 5, name: "隔壁的小黑", role: "玩伴", avatar: "https://picsum.photos/seed/cat2/100/100", status: "[离线] 正在晒太阳" },
+        { id: 6, name: "猫薄荷研究员", role: "专家", avatar: "https://picsum.photos/seed/mint/100/100", status: "[在线] 实验结果非常惊人" },
+      ];
+    } else if (isTech) {
+      personaContacts = [
+        { id: 4, name: "GitHub 机器人", role: "助手", avatar: "https://picsum.photos/seed/github/100/100", status: "[在线] 有新的 Pull Request" },
+        { id: 5, name: "StackOverflow 大神", role: "导师", avatar: "https://picsum.photos/seed/so/100/100", status: "[离线] 正在调试代码" },
+        { id: 6, name: "服务器监控", role: "系统", avatar: "https://picsum.photos/seed/server/100/100", status: "[在线] 负载正常" },
+      ];
+    } else if (isProfessional) {
+      personaContacts = [
+        { id: 4, name: "秘书", role: "助理", avatar: "https://picsum.photos/seed/sec/100/100", status: "[在线] 会议安排已更新" },
+        { id: 5, name: "客户经理", role: "合作伙伴", avatar: "https://picsum.photos/seed/client/100/100", status: "[忙碌] 正在处理合同" },
+        { id: 6, name: "法律顾问", role: "专家", avatar: "https://picsum.photos/seed/law/100/100", status: "[在线] 随时待命" },
+      ];
+    } else {
+      personaContacts = [
+        { id: 4, name: "Midjourney", role: "艺术家", avatar: "https://picsum.photos/seed/mj/100/100", status: "[忙碌] 正在生成 4K 杰作" },
+        { id: 5, name: "Sora", role: "导演", avatar: "https://picsum.photos/seed/sora/100/100", status: "[在线] 视频渲染中..." },
+        { id: 6, name: "AutoGPT", role: "执行官", avatar: "https://picsum.photos/seed/autogpt/100/100", status: "[在线] 任务队列已满" },
+      ];
+    }
 
     // Real messages with the user
     const realUserMessages = allMessages
@@ -97,62 +146,128 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
       isRealUser: true
     };
 
-    const baseMessages = isCatGirl ? [
-      userChat,
-      { 
-        id: 101, 
-        from: "小鱼干供应商", 
-        lastMsg: "老板，你要的顶级三文鱼到货了，给你留了两箱。", 
-        time: "10:24",
-        history: [
-          { role: 'other', text: "老板，你要的顶级三文鱼到货了，给你留了两箱。" },
-          { role: 'me', text: "太棒了喵！下午过去拿。" },
-          { role: 'other', text: "好嘞，老位置见。" }
-        ]
-      },
-      { 
-        id: 102, 
-        from: "隔壁的小黑", 
-        lastMsg: "出来晒太阳吗？今天的阳光特别暖和。", 
-        time: "昨天",
-        history: [
-          { role: 'other', text: "出来晒太阳吗？今天的阳光特别暖和。" },
-          { role: 'me', text: "等我睡个午觉就去喵~" }
-        ]
-      }
-    ] : [
-      userChat,
-      { 
-        id: 201, 
-        from: "Midjourney", 
-        lastMsg: "最新的模型更新了，快来看看生成的艺术品。", 
-        time: "10:24",
-        history: [
-          { role: 'other', text: "最新的模型更新了，快来看看生成的艺术品。" },
-          { role: 'me', text: "确实很惊艳，光影处理得太好了。" }
-        ]
-      },
-      { 
-        id: 202, 
-        from: "AutoGPT", 
-        lastMsg: "任务已完成，报告已发送至您的邮箱。", 
-        time: "昨天",
-        history: [
-          { role: 'other', text: "任务已完成，报告已发送至您的邮箱。" },
-          { role: 'me', text: "收到，辛苦了。" }
-        ]
-      }
-    ];
+    let baseMessages: any[] = [userChat];
+    if (isCat) {
+      baseMessages.push(
+        { 
+          id: 101, 
+          from: "小鱼干供应商", 
+          lastMsg: "老板，你要的顶级三文鱼到货了，给你留了两箱。", 
+          time: "10:24",
+          history: [
+            { role: 'other', text: "老板，你要的顶级三文鱼到货了，给你留了两箱。" },
+            { role: 'me', text: "太棒了喵！下午过去拿。" },
+            { role: 'other', text: "好嘞，老位置见。" }
+          ]
+        },
+        { 
+          id: 102, 
+          from: "隔壁的小黑", 
+          lastMsg: "出来晒太阳吗？今天的阳光特别暖和。", 
+          time: "昨天",
+          history: [
+            { role: 'other', text: "出来晒太阳吗？今天的阳光特别暖和。" },
+            { role: 'me', text: "等我睡个午觉就去喵~" }
+          ]
+        }
+      );
+    } else if (isTech) {
+      baseMessages.push(
+        { 
+          id: 201, 
+          from: "GitHub 机器人", 
+          lastMsg: "您的项目有新的 Pull Request。", 
+          time: "10:24",
+          history: [
+            { role: 'other', text: "您的项目有新的 Pull Request。" },
+            { role: 'me', text: "收到，马上看。" }
+          ]
+        },
+        { 
+          id: 202, 
+          from: "StackOverflow 大神", 
+          lastMsg: "你那个 bug 解决了没？", 
+          time: "昨天",
+          history: [
+            { role: 'other', text: "你那个 bug 解决了没？" },
+            { role: 'me', text: "还没呢，太头疼了。" }
+          ]
+        }
+      );
+    } else if (isProfessional) {
+      baseMessages.push(
+        { 
+          id: 301, 
+          from: "秘书", 
+          lastMsg: "下午三点的会议资料已发送。", 
+          time: "10:24",
+          history: [
+            { role: 'other', text: "下午三点的会议资料已发送。" },
+            { role: 'me', text: "收到，辛苦了。" }
+          ]
+        },
+        { 
+          id: 302, 
+          from: "客户经理", 
+          lastMsg: "合同条款需要再确认一下。", 
+          time: "昨天",
+          history: [
+            { role: 'other', text: "合同条款需要再确认一下。" },
+            { role: 'me', text: "好的，稍后回复。" }
+          ]
+        }
+      );
+    } else {
+      baseMessages.push(
+        { 
+          id: 401, 
+          from: "Midjourney", 
+          lastMsg: "最新的模型更新了，快来看看生成的艺术品。", 
+          time: "10:24",
+          history: [
+            { role: 'other', text: "最新的模型更新了，快来看看生成的艺术品。" },
+            { role: 'me', text: "确实很惊艳，光影处理得太好了。" }
+          ]
+        },
+        { 
+          id: 402, 
+          from: "AutoGPT", 
+          lastMsg: "任务已完成，报告已发送至您的邮箱。", 
+          time: "昨天",
+          history: [
+            { role: 'other', text: "任务已完成，报告已发送至您的邮箱。" },
+            { role: 'me', text: "收到，辛苦了。" }
+          ]
+        }
+      );
+    }
 
-    const personaNotes = isCatGirl ? [
-      { title: "关于主人的观察", content: `主人今天心情好像${persona.mood || '还不错'}喵！${persona.context ? `他在${persona.context}` : ''}` },
-      { title: "小鱼干清单", content: "1. 三文鱼味的\n2. 金枪鱼味的\n3. 还有那种脆脆的饼干" },
-      { title: "心情随笔", content: persona.mood ? `现在的感觉是：${persona.mood}。${persona.mood.includes('难过') ? '好想抱抱主人喵...' : '开心得想转圈圈！'}` : "今天也是元气满满的一天喵！" }
-    ] : [
-      { title: "关于人类的观察", content: `目标对象当前处于 ${persona.context || '未知环境'}。情绪指数：${persona.mood || '稳定'}。` },
-      { title: "系统日志", content: `[${new Date().toLocaleDateString()}] 核心情绪模块：${persona.mood || '正常运行'}。上下文同步：${persona.context || '完成'}。` },
-      { title: "秘密代码", content: "01101000 01100101 01101100 01101100 01101111" }
-    ];
+    let personaNotes: any[] = [];
+    if (isCat) {
+      personaNotes = [
+        { title: "关于主人的观察", content: `主人今天心情好像${persona.mood || '还不错'}喵！${persona.context ? `他在${persona.context}` : ''}` },
+        { title: "小鱼干清单", content: "1. 三文鱼味的\n2. 金枪鱼味的\n3. 还有那种脆脆的饼干" },
+        { title: "心情随笔", content: persona.mood ? `现在的感觉是：${persona.mood}。${persona.mood.includes('难过') ? '好想抱抱主人喵...' : '开心得想转圈圈！'}` : "今天也是元气满满的一天喵！" }
+      ];
+    } else if (isTech) {
+      personaNotes = [
+        { title: "待办事项", content: "1. 修复那个诡异的内存泄漏\n2. 重构聊天模块\n3. 优化 AI 响应速度" },
+        { title: "技术笔记", content: "React 19 的新特性很有意思，值得深入研究。" },
+        { title: "心情随笔", content: `现在的感觉是：${persona.mood || '专注'}。${persona.mood?.includes('累') ? '需要补充咖啡因...' : '代码运行得很顺畅！'}` }
+      ];
+    } else if (isProfessional) {
+      personaNotes = [
+        { title: "今日日程", content: "1. 10:00 部门会议\n2. 14:00 客户演示\n3. 16:00 合同评审" },
+        { title: "工作备忘", content: "记得跟进那个项目的进度。" },
+        { title: "心情随笔", content: `现在的感觉是：${persona.mood || '冷静'}。${persona.mood?.includes('忙') ? '保持专业，高效完成任务。' : '一切尽在掌握。'}` }
+      ];
+    } else {
+      personaNotes = [
+        { title: "关于人类的观察", content: `目标对象当前处于 ${persona.context || '未知环境'}。情绪指数：${persona.mood || '稳定'}。` },
+        { title: "系统日志", content: `[${new Date().toLocaleDateString()}] 核心情绪模块：${persona.mood || '正常运行'}。上下文同步：${persona.context || '完成'}。` },
+        { title: "秘密代码", content: "01101000 01100101 01101100 01101100 01101111" }
+      ];
+    }
 
     return {
       contacts: [...baseContacts, ...personaContacts],
@@ -727,6 +842,24 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-10">
+      {/* AI Thought Popup */}
+      <AnimatePresence>
+        {showThought && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 z-[200] bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-white/50 text-black max-w-[280px] text-sm font-medium"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-bold">AI</div>
+              <span className="text-xs font-bold text-gray-500">{persona.name} 的想法</span>
+            </div>
+            <p>{aiThought}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Exit Button */}
       <button 
         onClick={onClose}
