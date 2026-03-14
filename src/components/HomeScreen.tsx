@@ -1193,7 +1193,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="absolute top-0 left-0 right-0 h-20 bg-white/50 backdrop-blur-xl z-[60] flex items-end justify-between px-6 pb-4 shadow-sm border-b border-white/40"
+            className="absolute top-0 left-0 right-0 h-28 bg-white/50 backdrop-blur-xl z-[60] flex items-end justify-between px-6 pb-4 shadow-sm border-b border-white/40 pt-[env(safe-area-inset-top)]"
           >
             <button onClick={() => setShowAddWidgetModal(true)} className="w-8 h-8 bg-black/10 rounded-full flex items-center justify-center text-neutral-800 active:scale-95 transition-transform">
               <Plus size={20} />
