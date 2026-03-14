@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse } from 'lucide-react';
 import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen } from '../types';
 import { GoogleGenAI } from '@google/genai';
@@ -1696,7 +1696,7 @@ export function ChatScreen({
     }
   };
 
-  const handleCheckPhoneResponse = (msgId: string, accept: boolean) => {
+  const handleCheckPhoneResponse = useCallback((msgId: string, accept: boolean) => {
     setMessages(prev => prev.map(m => 
       m.id === msgId ? { ...m, checkPhoneStatus: accept ? 'accepted' : 'rejected' } : m
     ));
@@ -1725,18 +1725,12 @@ ${recentMessages}
     } else {
       handleSend("[系统提示：用户拒绝了你查看TA手机的请求。请根据你的人设作出反应（例如：生气、怀疑、撒娇等）。]", 'system', undefined, undefined, undefined, undefined, undefined, undefined, true);
     }
-  };
-
-  const handleCheckPhoneResponseRef = useRef(handleCheckPhoneResponse);
-  
-  useEffect(() => {
-    handleCheckPhoneResponseRef.current = handleCheckPhoneResponse;
-  }, [handleCheckPhoneResponse]);
+  }, [messages, handleSend]);
 
   useEffect(() => {
-    setPhoneResponseHandler(() => (msgId, accept) => handleCheckPhoneResponseRef.current(msgId, accept));
+    setPhoneResponseHandler(() => handleCheckPhoneResponse);
     return () => setPhoneResponseHandler(null);
-  }, [setPhoneResponseHandler]);
+  }, [setPhoneResponseHandler, handleCheckPhoneResponse]);
 
   const handleTransferClick = () => {
     setShowTransferModal(true);

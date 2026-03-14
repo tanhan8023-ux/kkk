@@ -2112,8 +2112,8 @@ export default function App() {
                 <PhoneIcon className="w-10 h-10 text-blue-500" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-neutral-900">AI 请求查看手机</h3>
-                <p className="text-neutral-500 text-sm">AI 想要查看您的手机内容，是否允许？</p>
+                <h3 className="text-xl font-bold text-neutral-900">{personas.find(p => p.id === aiPhoneRequest.personaId)?.name || 'AI'} 请求查看手机</h3>
+                <p className="text-neutral-500 text-sm">{personas.find(p => p.id === aiPhoneRequest.personaId)?.name || 'AI'} 想要查看您的手机内容，是否允许？</p>
               </div>
               <div className="flex gap-3">
                 <button 
