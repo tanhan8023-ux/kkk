@@ -124,6 +124,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = '';
   };
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
@@ -228,7 +229,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
             <input 
               type="file" accept="image/*" className="hidden" ref={lockWallpaperInputRef}
-              onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, lockScreenWallpaper: url }))}
+              onChange={(e) => handleImageUpload(e, (url) => setThemeState(prev => ({ ...prev, lockScreenWallpaper: url })))}
             />
           </div>
 
@@ -240,7 +241,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
               {(['default', 'square', 'neon', 'minimal', 'glass', 'star', 'heart', 'diamond', 'cyberpunk', 'liquid', 'luxury', 'biometric'] as const).map((style) => (
                 <button
                   key={style}
-                  onClick={() => setThemeState({ ...theme, fingerprintStyle: style })}
+                  onClick={() => setThemeState(prev => ({ ...prev, fingerprintStyle: style }))}
                   className={`py-2 rounded-lg text-[10px] font-medium border transition-all ${
                     (theme.fingerprintStyle || 'default') === style 
                       ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-sm' 
@@ -280,7 +281,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
             <input 
               type="file" accept="image/*" className="hidden" ref={wallpaperInputRef}
-              onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, wallpaper: url }))}
+              onChange={(e) => handleImageUpload(e, (url) => setThemeState(prev => ({ ...prev, wallpaper: url })))}
             />
           </div>
 
@@ -301,7 +302,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
             <input 
               type="file" accept="image/*" className="hidden" ref={momentsBgInputRef}
-              onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, momentsBg: url }))}
+              onChange={(e) => handleImageUpload(e, (url) => setThemeState(prev => ({ ...prev, momentsBg: url })))}
             />
           </div>
 
@@ -322,7 +323,7 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
             <input 
               type="file" accept="image/*" className="hidden" ref={chatBgInputRef}
-              onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, chatBg: url }))}
+              onChange={(e) => handleImageUpload(e, (url) => setThemeState(prev => ({ ...prev, chatBg: url })))}
             />
           </div>
 

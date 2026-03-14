@@ -187,6 +187,12 @@ export interface ThemeSettings {
     signature?: string;
     date?: string;
   };
+  acrylicStand?: {
+    leftImage?: string;
+    centerImage?: string;
+    rightImage?: string;
+    bgImage?: string;
+  };
   dynamicStatusBg?: string;
   notificationSound?: string;
   fingerprintStyle?: 'default' | 'square' | 'neon' | 'minimal' | 'glass' | 'star' | 'heart' | 'diamond' | 'cyberpunk' | 'liquid' | 'luxury' | 'biometric';

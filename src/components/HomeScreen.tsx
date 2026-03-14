@@ -10,6 +10,7 @@ import { MusicPlayerWidget } from './MusicPlayerWidget';
 import { ProfileCardWidget } from './ProfileCardWidget';
 import { DynamicStatusWidget } from './DynamicStatusWidget';
 import { LoveWidget } from './LoveWidget';
+import { AcrylicStandWidget } from './AcrylicStandWidget';
 
 interface Props {
   onNavigate: (screen: 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera') => void;
@@ -229,6 +230,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
     { type: 'app-aiphones', label: 'AI分身', w: 1, h: 1, icon: Smartphone },
     { type: 'app-photoalbum', label: '相册', w: 1, h: 1, icon: ImageIcon },
     { type: 'love-widget', label: '恋爱组件', w: 4, h: 2, icon: Heart },
+    { type: 'acrylic-stand', label: '立牌组件', w: 4, h: 2, icon: ImageIcon },
   ];
 
   const addWidget = (widgetTemplate: any) => {
@@ -297,6 +299,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
                 { id: 'app-wallet', type: 'app-wallet', x: 1, y: 2, w: 1, h: 1 },
                 { id: 'app-calculator', type: 'app-calculator', x: 2, y: 2, w: 1, h: 1 },
                 { id: 'app-camera', type: 'app-camera', x: 3, y: 2, w: 1, h: 1 },
+                { id: 'acrylic-stand-default', type: 'acrylic-stand', x: 0, y: 3, w: 4, h: 2 },
               ]
             }
           ]
@@ -949,6 +952,27 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
               name2={theme.loveWidget?.name2 || '小宝'}
               startDate={theme.loveWidget?.startDate || new Date().toISOString().split('T')[0]}
               bottomMessage={theme.loveWidget?.bottomMessage || '请靠近我和我的心'}
+            />
+          </div>
+        );
+      case 'acrylic-stand':
+        return (
+          <div className="w-full h-full">
+            <AcrylicStandWidget 
+              leftImage={theme.acrylicStand?.leftImage}
+              centerImage={theme.acrylicStand?.centerImage}
+              rightImage={theme.acrylicStand?.rightImage}
+              bgImage={theme.acrylicStand?.bgImage}
+              isEditing={isEditingLayout}
+              onUpdate={(updates) => {
+                setTheme(prev => ({
+                  ...prev,
+                  acrylicStand: {
+                    ...(prev.acrylicStand || {}),
+                    ...updates
+                  }
+                }));
+              }}
             />
           </div>
         );

@@ -303,6 +303,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
       }
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const renderMessageContent = (text: string) => {
