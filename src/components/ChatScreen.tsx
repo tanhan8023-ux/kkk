@@ -2149,17 +2149,17 @@ ${recentMessages}
                 >
                   <div className="relative shrink-0">
                     <img src={p.avatarUrl || defaultAiAvatar} className="w-16 h-16 rounded-2xl object-cover" alt="avatar" />
-                    {userProfile.avatarFrame && (
+                    {p.avatarFrame && (
                       <img 
-                        src={userProfile.avatarFrame} 
+                        src={p.avatarFrame} 
                         className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] object-contain pointer-events-none z-10 select-none"
                         alt="frame"
-                        style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))', transform: `translate(${userProfile.avatarFrameX || 0}px, ${userProfile.avatarFrameY || 0}px) scale(${userProfile.avatarFrameScale || 1})` }}
+                        style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))', transform: `translate(${p.avatarFrameX || 0}px, ${p.avatarFrameY || 0}px) scale(${p.avatarFrameScale || 1})` }}
                       />
                     )}
-                    {userProfile.avatarPendant && (
+                    {p.avatarPendant && (
                       <img 
-                        src={userProfile.avatarPendant} 
+                        src={p.avatarPendant} 
                         className="absolute -top-1 -right-1 w-6 h-6 object-contain pointer-events-none z-20 select-none"
                         alt="pendant"
                       />
@@ -2458,8 +2458,12 @@ ${recentMessages}
                       {currentPersona?.avatarFrame && (
                         <img 
                           src={currentPersona.avatarFrame} 
-                          className="absolute -top-2 -left-2 w-14 h-14 pointer-events-none z-10 select-none"
+                          className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] object-contain pointer-events-none z-10 select-none"
                           alt="frame"
+                          style={{ 
+                            filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))', 
+                            transform: `translate(${currentPersona.avatarFrameX || 0}px, ${currentPersona.avatarFrameY || 0}px) scale(${currentPersona.avatarFrameScale || 1})` 
+                          }}
                         />
                       )}
                       {currentPersona?.avatarPendant && (

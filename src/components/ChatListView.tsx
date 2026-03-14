@@ -28,7 +28,10 @@ export const ChatListView = ({ personas, messages, userProfile, setCurrentChatId
               src={p.avatarFrame} 
               className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] object-contain pointer-events-none z-10 select-none"
               alt="frame"
-              style={{ filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))' }}
+              style={{ 
+                filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))',
+                transform: `translate(${p.avatarFrameX || 0}px, ${p.avatarFrameY || 0}px) scale(${p.avatarFrameScale || 1})`
+              }}
             />
           )}
           {p.avatarPendant && (
