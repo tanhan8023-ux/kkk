@@ -1526,8 +1526,8 @@ export function ChatScreen({
         worldbook, 
         userProfile, 
         aiRef, 
-        true, 
-        "", 
+        false, 
+        "【最高优先级绝对指令】当前任务仅仅是生成一句内心的独白（心声），绝对不要生成任何用于回复用户的对话内容！绝对不要继续聊天！只输出心声！", 
         apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
         undefined,
         currentPersona.isOffline
