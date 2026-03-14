@@ -501,19 +501,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           handleFallback("搜索失败");
         });
     } else {
-      // Use Geolocation
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => fetchWeather(position.coords.latitude, position.coords.longitude),
-          (error) => {
-            console.error("Geolocation error:", error);
-            handleFallback("定位失败");
-          },
-          { timeout: 10000 }
-        );
-      } else {
-        handleFallback("无定位权限");
-      }
+      handleFallback("请在设置中输入城市");
     }
 
     return () => {

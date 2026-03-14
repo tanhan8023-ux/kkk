@@ -98,6 +98,8 @@ export interface ApiSettings {
   momentsApiUrl?: string;
   momentsApiKey?: string;
   momentsModel?: string;
+  autoPostMoments?: boolean;
+  autoUpdateStatus?: boolean;
 }
 
 export interface Widget {

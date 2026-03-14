@@ -670,7 +670,7 @@ export default function App() {
 
   // Autonomous Status Update
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || apiSettings.autoUpdateStatus === false) return;
     const interval = setInterval(async () => {
       if (personas.length === 0) return;
       

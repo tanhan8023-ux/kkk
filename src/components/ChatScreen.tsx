@@ -377,6 +377,7 @@ export function ChatScreen({
     if (!isActive) return;
 
     const checkAndPost = async () => {
+      if (apiSettings.autoPostMoments === false) return;
       const now = Date.now();
       // Check every 10-20 minutes (randomized)
       if (now - lastAutonomousPostTime.current < (10 + Math.random() * 10) * 60 * 1000) return;
