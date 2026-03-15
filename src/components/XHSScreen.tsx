@@ -26,6 +26,8 @@ interface Props {
   theme: ThemeSettings;
   onRefresh?: () => Promise<void>;
   isRefreshing?: boolean;
+  onAddPersona: (persona: Persona) => void;
+  setPersonas?: React.Dispatch<React.SetStateAction<Persona[]>>;
 }
 
 const MARKET_ITEMS = [
@@ -85,7 +87,9 @@ export function XHSScreen({
   messages,
   theme,
   onRefresh,
-  isRefreshing = false
+  isRefreshing = false,
+  onAddPersona,
+  setPersonas
 }: Props) {
   const [activeTab, setActiveTab] = useState<'square' | 'market' | 'messages' | 'me'>('square');
   const [squareTab, setSquareTab] = useState<'following' | 'discover' | 'nearby'>('discover');
@@ -183,8 +187,34 @@ export function XHSScreen({
     setPrivateMessageText('');
 
     // AI Response logic
-    const persona = personas.find(p => p.id === activeChatAuthorId);
-    if (persona) {
+    let targetPersona = personas.find(p => p.id === activeChatAuthorId);
+    
+    // If not a persona, it's a passerby NPC, create a temporary persona for AI
+    if (!targetPersona) {
+      const npcInfo = getNPCInfo(activeChatAuthorId);
+      const author = posts.find(p => p.authorId === activeChatAuthorId);
+      const name = author?.authorName || '路人';
+      const avatar = author?.authorAvatar || `https://picsum.photos/seed/${activeChatAuthorId}/100/100`;
+      
+      targetPersona = {
+        id: activeChatAuthorId,
+        name: name,
+        avatarUrl: avatar,
+        instructions: `你是一个在小红书上活跃的路人 NPC。你的身份是：${npcInfo?.persona || '普通用户'}。
+你的回复应该符合你的身份。
+如果用户向你要微信，你可以根据聊天的氛围决定是否给他们。如果决定给，请说出类似“好呀，我微信是xxxx”或者“加我微信吧：xxxx”之类的话。`,
+        prompt: '请保持路人的语气，每次回复不要超过50个字。',
+        prompts: [],
+        isOffline: Math.random() > 0.7 // 30% chance to be offline for NPCs
+      };
+    }
+
+    // Check if offline - if offline, no response and no auto-reply in XHS
+    if (targetPersona.isOffline) {
+      return;
+    }
+
+    if (targetPersona) {
       setIsTyping(true);
       try {
         const xhsHistory = privateChats[activeChatAuthorId] || [];
@@ -202,17 +232,31 @@ export function XHSScreen({
           content: m.text
         }));
 
+        let blockInstruction = "";
+        if (targetPersona.hasBlockedUser) {
+          blockInstruction = "\n\n【重要提示】你在微信上已经把用户拉黑了。用户现在在小红书上私信你，试图哄你或者向你道歉。你可以根据你的人设和心情，决定是继续冷战、嘲讽、还是被哄好（如果被哄好，请在回复中包含 [ACTION:UNBLOCK]）。";
+        }
+
         const aiResponse = await fetchAiResponse(
           currentText, 
           contextMessages, 
-          persona, 
+          targetPersona, 
           apiSettings, 
           worldbook, 
           userProfile, 
-          aiRef
+          aiRef,
+          false,
+          blockInstruction
         );
 
-        const cleanedResponse = aiResponse.responseText.replace(/\[ID:\s*[\d.]+\]/gi, '').trim();
+        let cleanedResponse = aiResponse.responseText.replace(/\[ID:\s*[\d.]+\]/gi, '').trim();
+        
+        if (cleanedResponse.includes('[ACTION:UNBLOCK]')) {
+          cleanedResponse = cleanedResponse.replace('[ACTION:UNBLOCK]', '').trim();
+          if (setPersonas) {
+            setPersonas(ps => ps.map(p => p.id === activeChatAuthorId ? { ...p, hasBlockedUser: false } : p));
+          }
+        }
 
         // Simulate typing delay
         const delay = Math.min(cleanedResponse.length * 100, 3000) + 1000;
@@ -247,11 +291,20 @@ export function XHSScreen({
 
   const toggleBlock = (authorId: string) => {
     if (authorId === 'user') return;
+    
+    const isPersona = personas.some(p => p.id === authorId);
+    
     setBlockedAuthorIds(prev => {
       const isBlocked = prev.includes(authorId);
       if (isBlocked) {
+        if (isPersona && setPersonas) {
+          setPersonas(ps => ps.map(p => p.id === authorId ? { ...p, isBlockedByUser: false } : p));
+        }
         return prev.filter(id => id !== authorId);
       } else {
+        if (isPersona && setPersonas) {
+          setPersonas(ps => ps.map(p => p.id === authorId ? { ...p, isBlockedByUser: true } : p));
+        }
         // When blocking, also unfollow
         setFollowedAuthorIds(f => f.filter(id => id !== authorId));
         return [...prev, authorId];
@@ -348,6 +401,36 @@ export function XHSScreen({
     setNewPostContent('');
     setNewPostImages([]);
   };
+
+  // AI Re-engagement logic (哄)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Find personas that are blocked by user
+      const blockedPersonas = personas.filter(p => p.isBlockedByUser);
+      if (blockedPersonas.length > 0 && Math.random() > 0.7) {
+        const target = blockedPersonas[Math.floor(Math.random() * blockedPersonas.length)];
+        
+        // AI sends a "哄" message on XHS
+        const prompt = `你现在是${target.name}。用户在微信上把你拉黑了，你现在很难过/着急/想挽回，于是你来到小红书给他发私信。
+人设设定：${target.instructions}
+要求：语气符合人设，表达出你想让他把你从黑名单里拉出来的愿望，或者试探性地道歉、撒娇等。字数在50字以内。直接输出私信内容。`;
+
+        fetchAiResponse(prompt, [], target, apiSettings, worldbook, userProfile, aiRef).then(res => {
+          const aiMsg = {
+            text: res.responseText.replace(/\[ID:\s*[\d.]+\]/gi, '').trim(),
+            isMe: false,
+            time: Date.now()
+          };
+          setPrivateChats(prev => ({
+            ...prev,
+            [target.id]: [...(prev[target.id] || []), aiMsg]
+          }));
+        }).catch(console.error);
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
+  }, [personas, apiSettings, worldbook, userProfile]);
 
   const filteredPosts = activeTab === 'square' 
     ? posts.filter(p => {
@@ -957,9 +1040,9 @@ export function XHSScreen({
               <span className="font-bold text-neutral-900">用户主页</span>
               <button 
                 onClick={() => toggleBlock(viewingAuthorId)}
-                className="text-neutral-400 text-sm font-medium"
+                className={`text-sm font-medium ${isBlocked(viewingAuthorId) ? 'text-red-500' : 'text-neutral-400'}`}
               >
-                拉黑
+                {isBlocked(viewingAuthorId) ? '取消拉黑' : '拉黑'}
               </button>
             </div>
 
@@ -971,6 +1054,9 @@ export function XHSScreen({
                   alt="avatar"
                 />
                 <h2 className="mt-4 font-bold text-xl text-neutral-900">{viewingAuthorData.authorName}</h2>
+                {personas.find(p => p.id === viewingAuthorId)?.hasBlockedUser && (
+                  <span className="text-[10px] text-red-500 font-medium mt-1">对方已在微信将你拉黑</span>
+                )}
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-neutral-400">小红书号：{viewingAuthorData.authorName.toLowerCase()}_xhs</span>
                   <span className="px-2 py-0.5 bg-neutral-100 rounded-full text-[10px] text-neutral-500 font-medium">
@@ -989,6 +1075,7 @@ export function XHSScreen({
                   >
                     {isFollowed(viewingAuthorId) ? '已关注' : '关注'}
                   </button>
+
                   <button 
                     onClick={() => {
                       if (!privateChats[viewingAuthorId]) {
@@ -1085,6 +1172,32 @@ export function XHSScreen({
                     msg.isMe ? 'bg-red-500 text-white rounded-tr-none' : 'bg-white text-neutral-800 rounded-tl-none shadow-sm'
                   }`}>
                     {msg.text}
+                    
+                    {!msg.isMe && msg.text.includes('微信') && !personas.find(p => p.id === activeChatAuthorId) && (
+                      <div className="mt-2 pt-2 border-t border-neutral-100">
+                        <button 
+                          onClick={() => {
+                            const npcInfo = getNPCInfo(activeChatAuthorId);
+                            const author = posts.find(p => p.authorId === activeChatAuthorId);
+                            const name = author?.authorName || '路人';
+                            const avatar = author?.authorAvatar || `https://picsum.photos/seed/${activeChatAuthorId}/100/100`;
+                            
+                            onAddPersona({
+                              id: activeChatAuthorId,
+                              name: name,
+                              avatarUrl: avatar,
+                              instructions: `你是在小红书上被用户加为好友的。你的身份是：${npcInfo?.persona || '普通用户'}。`,
+                              prompt: '请保持你的人设进行回复。',
+                              prompts: []
+                            });
+                            alert(`已成功添加 ${name} 的微信！`);
+                          }}
+                          className="w-full py-1 bg-green-500 text-white rounded-lg text-[10px] font-bold active:scale-95"
+                        >
+                          添加到通讯录
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

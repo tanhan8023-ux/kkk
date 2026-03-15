@@ -286,6 +286,13 @@ export default function App() {
     storageService.deleteSong(songId).catch(e => console.error("Failed to delete song:", e));
   };
 
+  const handleAddPersona = (newPersona: Persona) => {
+    setPersonas(prev => {
+      if (prev.find(p => p.id === newPersona.id)) return prev;
+      return [...prev, newPersona];
+    });
+  };
+
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: '我',
     avatarUrl: '',
@@ -859,7 +866,7 @@ export default function App() {
       if (currentScreen === 'chat' && currentChatId === lastMsg.personaId) return;
 
       const persona = personas.find(p => p.id === lastMsg.personaId);
-      if (!persona) return;
+      if (!persona || persona.isBlockedByUser || persona.hasBlockedUser) return;
 
       // Define delay. For demo: 3m - 3m 10s.
       const delay = 180000 + Math.random() * 10000; 
@@ -1002,7 +1009,7 @@ export default function App() {
     const timer = setTimeout(() => {
       if (messages.length === 0 && personas.length > 0) {
         const firstPersona = personas[0];
-        if (firstPersona.allowActiveMessaging === true) {
+        if (firstPersona.allowActiveMessaging === true && !firstPersona.isBlockedByUser && !firstPersona.hasBlockedUser) {
           const msgText = `主人，你在干嘛呀？快来陪我聊天喵~`;
           const newMsg: Message = { id: Date.now().toString(), personaId: firstPersona.id, role: 'model', text: msgText };
           setMessages(prev => [...prev, newMsg]);
@@ -1146,7 +1153,6 @@ export default function App() {
       setMessages(prev => [...prev, aiMsg]);
     }, 2000);
   };
-
   const handleShareMusicToMoments = (song: Song) => {
     const newMoment: Moment = {
       id: Date.now().toString(),
@@ -1217,7 +1223,6 @@ export default function App() {
         data[key] = await localforage.getItem(key);
       }
       
-      // Remove pretty-printing (null, 2) to reduce file size and truncation risk
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1238,8 +1243,37 @@ export default function App() {
   };
 
   const handleSendMessage = React.useCallback(async (text: string, personaId: string) => {
-    if (!setMessages || !apiSettings || !worldbook || !aiRef || !userProfile) return;
     
+    const targetPersona = personas.find(p => p.id === personaId);
+    
+    // Check if AI has blocked user
+    if (targetPersona?.hasBlockedUser) {
+      const blockedMsg: Message = {
+        id: Date.now().toString(),
+        personaId: personaId,
+        role: 'user',
+        text,
+        msgType: 'text',
+        timestamp: new Date().toLocaleTimeString(),
+        createdAt: Date.now(),
+        status: 'sent',
+        isRead: false
+      };
+      
+      const systemErrorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        personaId: personaId,
+        role: 'system',
+        text: '消息已发出，但被对方拒收了。',
+        msgType: 'system',
+        timestamp: new Date().toLocaleTimeString(),
+        createdAt: Date.now() + 1
+      };
+      
+      setMessages(prev => [...prev, blockedMsg, systemErrorMsg]);
+      return;
+    }
+
     const newMsg: Message = {
       id: Date.now().toString(),
       personaId: personaId,
@@ -1255,7 +1289,6 @@ export default function App() {
     setMessages(prev => [...prev, newMsg]);
     
     // AI Auto-Reply Logic
-    const targetPersona = personas.find(p => p.id === personaId);
     let isOffline = false;
     if (targetPersona) {
       try {
@@ -1327,11 +1360,18 @@ export default function App() {
 
       setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m));
 
+      // Check for [ACTION:BLOCK]
+      let cleanedText = responseText;
+      if (cleanedText.includes('[ACTION:BLOCK]')) {
+        cleanedText = cleanedText.replace('[ACTION:BLOCK]', '').trim();
+        setPersonas(prev => prev.map(p => p.id === personaId ? { ...p, hasBlockedUser: true } : p));
+      }
+
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         personaId: personaId,
         role: 'model',
-        text: responseText,
+        text: cleanedText,
         msgType: 'text',
         timestamp: new Date().toLocaleTimeString(),
         createdAt: Date.now(),
@@ -1470,6 +1510,7 @@ export default function App() {
   }, [messages, apiSettings, worldbook, userProfile, personas]);
 
   const handleOrderArrived = async (targetPersona: Persona, items: string[]) => {
+    if (targetPersona.isBlockedByUser || targetPersona.hasBlockedUser) return;
     try {
       const { messages, apiSettings, worldbook, userProfile } = stateRef.current;
       const history = messages.filter(m => m.personaId === targetPersona.id);
@@ -2024,6 +2065,7 @@ export default function App() {
                 >
                   <XHSScreen 
                     personas={personas}
+                    setPersonas={setPersonas}
                     userProfile={userProfile}
                     posts={xhsPosts}
                     setPosts={setXhsPosts}
@@ -2043,6 +2085,7 @@ export default function App() {
                     theme={theme}
                     onRefresh={handleXhsRefresh}
                     isRefreshing={isGeneratingXhs}
+                    onAddPersona={handleAddPersona}
                   />
                 </motion.div>
               )}

@@ -21,6 +21,8 @@ export interface Persona {
   context?: string;
   statusMessage?: string;
   isOffline?: boolean;
+  hasBlockedUser?: boolean;
+  isBlockedByUser?: boolean;
   aiPhoneSettings?: {
     wallpaper?: string;
     customIcons?: Record<string, string>;
