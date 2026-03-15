@@ -436,8 +436,8 @@ export default function App() {
       likes: 520,
       comments: 2,
       commentsList: [
-        { id: 'c1', authorName: '路人甲', authorAvatar: 'https://picsum.photos/seed/user1/100/100', text: '太可爱了喵！', createdAt: Date.now() - 1800000 },
-        { id: 'c2', authorName: '学霸学长', authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80', text: '裙子很适合你。', createdAt: Date.now() - 900000 }
+        { id: 'c1', authorId: 'passerby_1', authorName: '路人甲', authorAvatar: 'https://picsum.photos/seed/user1/100/100', text: '太可爱了喵！', createdAt: Date.now() - 1800000 },
+        { id: 'c2', authorId: 'npc1', authorName: '学霸学长', authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80', text: '裙子很适合你。', createdAt: Date.now() - 900000 }
       ],
       createdAt: Date.now() - 3600000
     },
@@ -465,7 +465,7 @@ export default function App() {
       likes: 88,
       comments: 1,
       commentsList: [
-        { id: 'c3', authorName: '元气少女', authorAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80', text: '学长带带我！', createdAt: Date.now() - 300000 }
+        { id: 'c3', authorId: 'npc2', authorName: '元气少女', authorAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80', text: '学长带带我！', createdAt: Date.now() - 300000 }
       ],
       createdAt: Date.now() - 14400000
     },
@@ -572,6 +572,34 @@ export default function App() {
       comments: 56,
       commentsList: [],
       createdAt: Date.now() - 86400000
+    },
+    {
+      id: 'xhs12',
+      authorId: 'passerby_2',
+      authorName: '极简主义者',
+      authorAvatar: 'https://picsum.photos/seed/minimal/100/100',
+      title: '断舍离后的房间，呼吸都变得轻盈了。🌿',
+      content: '扔掉了不再心动的东西，留下的都是真正热爱的。生活本来就该这么简单。✨ #断舍离 #极简生活 #治愈系',
+      images: ['https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=800&q=80'],
+      likes: 320,
+      comments: 15,
+      commentsList: [
+        { id: 'c4', authorId: 'passerby_3', authorName: '爱生活的猫', authorAvatar: 'https://picsum.photos/seed/cat/100/100', text: '我也想开始断舍离了！', createdAt: Date.now() - 3600000 }
+      ],
+      createdAt: Date.now() - 90000000
+    },
+    {
+      id: 'xhs13',
+      authorId: 'passerby_4',
+      authorName: '咖啡中毒患者',
+      authorAvatar: 'https://picsum.photos/seed/coffee/100/100',
+      title: '今日份咖啡因已到账。☕️',
+      content: '没有什么是一杯冰美式解决不了的，如果有，那就两杯。早安，打工人！☀️ #咖啡日常 #冰美式 #早安',
+      images: ['https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80'],
+      likes: 150,
+      comments: 3,
+      commentsList: [],
+      createdAt: Date.now() - 100000000
     }
   ]);
 
@@ -595,7 +623,7 @@ export default function App() {
         const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
         const newPost: XHSPost = {
           id: `xhs-gen-${Date.now()}`,
-          authorId: `npc-gen-${Math.random().toString(36).substr(2, 9)}`,
+          authorId: `passerby_gen_${Math.random().toString(36).substr(2, 9)}`,
           authorName: newPostData.authorName,
           authorAvatar: newPostData.authorAvatar,
           title: newPostData.title,

@@ -306,6 +306,7 @@ export interface Moment {
 
 export interface XHSComment {
   id: string;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   text: string;

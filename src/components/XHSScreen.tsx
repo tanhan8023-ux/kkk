@@ -37,6 +37,34 @@ const MARKET_ITEMS = [
   { id: 'm6', title: ' vintage中古耳环', price: '¥158', image: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=400&q=80', author: 'OldTime', desc: '在此刻相遇即是缘分，孤品仅此一对，错过不再有。' },
 ];
 
+const MBTIS = ['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP', 'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'];
+const ZODIACS = ['白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座', '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座'];
+
+// Helper to get consistent NPC info based on authorId
+const getNPCInfo = (authorId: string) => {
+  if (!authorId || (!authorId.startsWith('passerby_') && !authorId.startsWith('npc'))) return null;
+  
+  // Use hash of authorId for deterministic random
+  let hash = 0;
+  for (let i = 0; i < authorId.length; i++) {
+    hash = ((hash << 5) - hash) + authorId.charCodeAt(i);
+    hash |= 0;
+  }
+  const absHash = Math.abs(hash);
+  
+  const mbti = MBTIS[absHash % MBTIS.length];
+  const zodiac = ZODIACS[(absHash >> 4) % ZODIACS.length];
+  
+  // 1 or 2 components
+  const type = absHash % 3;
+  let persona = '';
+  if (type === 0) persona = mbti;
+  else if (type === 1) persona = zodiac;
+  else persona = `${mbti} ${zodiac}`;
+  
+  return { mbti, zodiac, persona };
+};
+
 export function XHSScreen({ 
   personas, 
   userProfile, 
@@ -79,8 +107,63 @@ export function XHSScreen({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedPost = posts.find(p => p.id === selectedPostId);
-  const viewingAuthorPost = posts.find(p => p.authorId === viewingAuthorId);
-  const activeChatAuthor = posts.find(p => p.authorId === activeChatAuthorId);
+  
+  // Enhanced viewingAuthor logic to handle NPCs
+  const getViewingAuthorData = () => {
+    if (!viewingAuthorId) return null;
+    
+    // 1. Check if it's a Persona
+    const persona = personas.find(p => p.id === viewingAuthorId);
+    if (persona) {
+      return {
+        authorId: persona.id,
+        authorName: persona.name,
+        authorAvatar: persona.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+        persona: persona.mood || '活跃中'
+      };
+    }
+    
+    // 2. Check if it's an existing author in posts
+    const postAuthor = posts.find(p => p.authorId === viewingAuthorId);
+    if (postAuthor) {
+      const npcInfo = getNPCInfo(viewingAuthorId);
+      return {
+        authorId: postAuthor.authorId,
+        authorName: postAuthor.authorName,
+        authorAvatar: postAuthor.authorAvatar,
+        persona: npcInfo?.persona || '路人'
+      };
+    }
+    
+    // 3. Generate dynamic NPC data if not found
+    const npcInfo = getNPCInfo(viewingAuthorId);
+    if (npcInfo) {
+      // Try to find name/avatar from comments if it was a commenter
+      let name = '路人';
+      let avatar = `https://picsum.photos/seed/${viewingAuthorId}/100/100`;
+      
+      for (const p of posts) {
+        const comment = p.commentsList?.find(c => c.authorId === viewingAuthorId);
+        if (comment) {
+          name = comment.authorName;
+          avatar = comment.authorAvatar;
+          break;
+        }
+      }
+      
+      return {
+        authorId: viewingAuthorId,
+        authorName: name,
+        authorAvatar: avatar,
+        persona: npcInfo.persona
+      };
+    }
+    
+    return null;
+  };
+
+  const viewingAuthorData = getViewingAuthorData();
+  const activeChatAuthor = posts.find(p => p.authorId === activeChatAuthorId) || personas.find(p => p.id === activeChatAuthorId);
 
   const handleSendPrivateMessage = async () => {
     if (!privateMessageText.trim() || !activeChatAuthorId) return;
@@ -210,6 +293,7 @@ export function XHSScreen({
       if (post.id === selectedPostId) {
         const newComment = {
           id: Date.now().toString(),
+          authorId: 'user',
           authorName: userProfile.name,
           authorAvatar: userProfile.avatarUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80',
           text: commentText,
@@ -644,9 +728,14 @@ export function XHSScreen({
                         <div key={comment.id} className="flex gap-3">
                           <button 
                             onClick={() => {
-                              // Find authorId from posts if possible, or just use a mock logic
-                              const author = posts.find(p => p.authorName === comment.authorName);
-                              if (author) setViewingAuthorId(author.authorId);
+                              if (comment.authorId) {
+                                setViewingAuthorId(comment.authorId);
+                              } else {
+                                // Fallback for old comments without authorId
+                                const author = posts.find(p => p.authorName === comment.authorName);
+                                if (author) setViewingAuthorId(author.authorId);
+                                else setViewingAuthorId(`passerby_${comment.authorName}`);
+                              }
                             }}
                             className="shrink-0 active:opacity-70"
                           >
@@ -656,8 +745,13 @@ export function XHSScreen({
                             <div className="flex items-center justify-between">
                               <button 
                                 onClick={() => {
-                                  const author = posts.find(p => p.authorName === comment.authorName);
-                                  if (author) setViewingAuthorId(author.authorId);
+                                  if (comment.authorId) {
+                                    setViewingAuthorId(comment.authorId);
+                                  } else {
+                                    const author = posts.find(p => p.authorName === comment.authorName);
+                                    if (author) setViewingAuthorId(author.authorId);
+                                    else setViewingAuthorId(`passerby_${comment.authorName}`);
+                                  }
                                 }}
                                 className="text-[13px] font-semibold text-neutral-500 active:opacity-70"
                               >
@@ -847,7 +941,7 @@ export function XHSScreen({
 
       {/* Author Profile Modal */}
       <AnimatePresence>
-        {viewingAuthorId && viewingAuthorId !== 'user' && viewingAuthorPost && (
+        {viewingAuthorId && viewingAuthorId !== 'user' && viewingAuthorData && (
           <motion.div 
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -872,12 +966,17 @@ export function XHSScreen({
             <div className="flex-1 overflow-y-auto">
               <div className="p-6 flex flex-col items-center border-b border-neutral-50">
                 <img 
-                  src={viewingAuthorPost.authorAvatar} 
+                  src={viewingAuthorData.authorAvatar} 
                   className="w-24 h-24 rounded-full object-cover border-4 border-neutral-50 shadow-sm"
                   alt="avatar"
                 />
-                <h2 className="mt-4 font-bold text-xl text-neutral-900">{viewingAuthorPost.authorName}</h2>
-                <p className="text-xs text-neutral-400 mt-1">小红书号：{viewingAuthorPost.authorName.toLowerCase()}_xhs</p>
+                <h2 className="mt-4 font-bold text-xl text-neutral-900">{viewingAuthorData.authorName}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-neutral-400">小红书号：{viewingAuthorData.authorName.toLowerCase()}_xhs</span>
+                  <span className="px-2 py-0.5 bg-neutral-100 rounded-full text-[10px] text-neutral-500 font-medium">
+                    {viewingAuthorData.persona}
+                  </span>
+                </div>
                 
                 <div className="flex gap-4 mt-6 w-full">
                   <button 
@@ -897,6 +996,8 @@ export function XHSScreen({
                       }
                       setActiveChatAuthorId(viewingAuthorId);
                       setViewingAuthorId(null);
+                      // If it's a dynamic NPC, we might want to switch to messages tab
+                      // but keep the context.
                       setActiveTab('messages');
                     }}
                     className="w-10 h-10 rounded-full border border-neutral-200 flex items-center justify-center text-neutral-600 active:bg-neutral-50"
@@ -907,15 +1008,15 @@ export function XHSScreen({
 
                 <div className="flex gap-10 mt-8">
                   <div className="flex flex-col items-center">
-                    <span className="font-bold text-neutral-900">{viewingAuthorPost.likes + 120}</span>
+                    <span className="font-bold text-neutral-900">{(viewingAuthorId.length * 42) % 1000 + 120}</span>
                     <span className="text-[11px] text-neutral-500">获赞与收藏</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="font-bold text-neutral-900">8.2k</span>
+                    <span className="font-bold text-neutral-900">{(viewingAuthorId.length * 13) % 500 + 10}</span>
                     <span className="text-[11px] text-neutral-500">粉丝</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="font-bold text-neutral-900">12</span>
+                    <span className="font-bold text-neutral-900">{(viewingAuthorId.length * 7) % 200 + 5}</span>
                     <span className="text-[11px] text-neutral-500">关注</span>
                   </div>
                 </div>
@@ -923,13 +1024,26 @@ export function XHSScreen({
 
               <div className="p-1.5 grid grid-cols-2 gap-1.5">
                 {posts.filter(p => p.authorId === viewingAuthorId).map(post => (
-                  <div key={post.id} className="bg-white rounded-lg overflow-hidden shadow-sm border border-neutral-50">
+                  <div 
+                    key={post.id} 
+                    onClick={() => {
+                      setSelectedPostId(post.id);
+                      setViewingAuthorId(null);
+                    }}
+                    className="bg-white rounded-lg overflow-hidden shadow-sm border border-neutral-50 active:opacity-90"
+                  >
                     <img src={post.images[0]} className="w-full aspect-[3/4] object-cover" alt="post" />
                     <div className="p-2">
                       <h3 className="text-[12px] font-semibold text-neutral-800 line-clamp-1">{post.title}</h3>
                     </div>
                   </div>
                 ))}
+                {posts.filter(p => p.authorId === viewingAuthorId).length === 0 && (
+                  <div className="col-span-2 py-20 flex flex-col items-center justify-center text-neutral-300">
+                    <ImageIcon size={40} strokeWidth={1} />
+                    <p className="text-xs mt-2">还没有发布过笔记哦</p>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -951,7 +1065,14 @@ export function XHSScreen({
               <button onClick={() => setActiveChatAuthorId(null)} className="text-neutral-600">
                 <ArrowLeft size={24} />
               </button>
-              <span className="font-bold text-neutral-900">{activeChatAuthor.authorName}</span>
+              <div className="flex flex-col items-center">
+                <span className="font-bold text-neutral-900">
+                  {activeChatAuthor && 'authorName' in activeChatAuthor ? activeChatAuthor.authorName : (activeChatAuthor as any)?.name || '路人'}
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  {getNPCInfo(activeChatAuthorId)?.persona || '活跃中'}
+                </span>
+              </div>
               <button className="text-neutral-600">
                 <X size={22} />
               </button>
