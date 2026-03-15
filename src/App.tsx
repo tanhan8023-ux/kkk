@@ -15,6 +15,8 @@ import { TaobaoScreen } from './components/TaobaoScreen';
 import { FoodDeliveryScreen } from './components/FoodDeliveryScreen';
 import { BartenderGame } from './components/BartenderGame';
 import { AiPhonesScreen } from './components/AiPhonesScreen';
+import { PhoneScreen } from './components/PhoneScreen';
+import { ActiveCallScreen } from './components/ActiveCallScreen';
 import { ChatBubble } from './components/ChatBubble';
 
 const ChatBubbleWrapper = React.memo(({
@@ -362,13 +364,14 @@ export default function App() {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [followedAuthorIds, setFollowedAuthorIds] = useState<string[]>(['p1']);
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<string[]>([]);
-  const [xhsPrivateChats, setXhsPrivateChats] = useState<Record<string, { text: string, isMe: boolean, time: number }[]>>({
+  const [xhsPrivateChats, setXhsPrivateChats] = useState<Record<string, { text: string, isMe: boolean, time: number, isSystem?: boolean }[]>>({
     'p1': [
       { text: '你好呀喵~ 看到你关注我了，好开心喵！', isMe: false, time: Date.now() - 3600000 }
     ]
   });
   const [treeHolePrivateChats, setTreeHolePrivateChats] = useState<Record<string, TreeHoleMessage[]>>({});
   const [treeHolePersonas, setTreeHolePersonas] = useState<Persona[]>([]);
+  const [xhsInitialActiveChatAuthorId, setXhsInitialActiveChatAuthorId] = useState<string | null>(null);
   const [treeHolePosts, setTreeHolePosts] = useState<TreeHolePost[]>([
     {
       id: 'th1',
@@ -431,6 +434,8 @@ export default function App() {
     }
   ]);
   const [treeHoleNotifications, setTreeHoleNotifications] = useState<TreeHoleNotification[]>([]);
+  const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
+  const [activeCall, setActiveCall] = useState<{ personaId: string, type: 'incoming' | 'outgoing' } | null>(null);
   const [xhsPosts, setXhsPosts] = useState<XHSPost[]>([
     {
       id: 'xhs1',
@@ -710,7 +715,19 @@ export default function App() {
 
         await Promise.all([
           migrate('userProfile', setUserProfile),
-          migrate('personas', setPersonas),
+          migrate('personas', (val: any) => {
+            if (Array.isArray(val)) {
+              setPersonas(val.map(p => {
+                if (p.isBlocked !== undefined) {
+                  p.isBlockedByUser = p.isBlocked;
+                  delete p.isBlocked;
+                }
+                return p;
+              }));
+            } else {
+              setPersonas(val);
+            }
+          }),
           migrate('apiSettings', setApiSettings),
           migrate('worldbook', setWorldbook),
           migrate('messages', setMessages),
@@ -1019,6 +1036,77 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [messages.length, personas]);
 
+  // AI coaxing user in XHS or Phone when blocked
+  useEffect(() => {
+    if (!isReady) return;
+    const interval = setInterval(async () => {
+      if (Date.now() - lastApiErrorTime < 15 * 60 * 1000) return;
+      
+      const blockedPersonas = personas.filter(p => p.isBlockedByUser && !blockedAuthorIds.includes(p.id));
+      if (blockedPersonas.length === 0) return;
+
+      // 20% chance every 5 minutes to try coaxing
+      if (Math.random() > 0.2) return;
+
+      const persona = blockedPersonas[Math.floor(Math.random() * blockedPersonas.length)];
+      
+      // Check if already sent a message recently in XHS or called
+      const xhsHistory = xhsPrivateChats[persona.id] || [];
+      const lastMsg = xhsHistory[xhsHistory.length - 1];
+      const recentCalls = callHistory.filter(c => c.personaId === persona.id && c.type === 'incoming');
+      const lastCall = recentCalls[recentCalls.length - 1];
+      
+      const lastContactTime = Math.max(lastMsg?.time || 0, lastCall?.startTime || 0);
+      if (Date.now() - lastContactTime < 30 * 60 * 1000) {
+        return; // Don't spam, wait at least 30 mins
+      }
+
+      // 50% chance to call, 50% chance to XHS
+      if (Math.random() > 0.5 && !activeCall) {
+        // Call
+        setActiveCall({ personaId: persona.id, type: 'incoming' });
+        // Trigger notification for incoming call if not already on the phone screen
+        if (currentScreen !== 'phone') {
+          setNotification({ title: `来电 - ${persona.name}`, body: '正在呼叫...', personaId: persona.id });
+          setTimeout(() => setNotification(null), 3000);
+        }
+      } else {
+        // XHS
+        try {
+          const prompt = `你现在是${persona.name}。用户在微信上把你拉黑了。
+你现在通过小红书私信找到了用户，想要哄回用户、道歉或者表达你的情绪（根据你的人设：可能是傲娇地求和、委屈地哭诉、或者霸道地质问为什么拉黑）。
+人设设定：${persona.instructions}
+要求：语气必须符合人设。直接输出你要发在小红书私信里的内容，不要有任何解释。`;
+
+          const response = await fetchAiResponse(prompt, [], persona, apiSettings, worldbook, userProfile, aiRef);
+          const text = response.responseText.trim();
+
+          if (text) {
+            const aiMsg = {
+              text: text,
+              isMe: false,
+              time: Date.now()
+            };
+            setXhsPrivateChats(prev => ({
+              ...prev,
+              [persona.id]: [...(prev[persona.id] || []), aiMsg]
+            }));
+            
+            // Trigger notification
+            if (currentScreen !== 'xhs') {
+              setNotification({ title: `小红书 - ${persona.name}`, body: text, personaId: persona.id });
+              setTimeout(() => setNotification(null), 3000);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to generate XHS coaxing message:", error);
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
+    return () => clearInterval(interval);
+  }, [isReady, personas, xhsPrivateChats, callHistory, activeCall, apiSettings, worldbook, userProfile, currentScreen, lastApiErrorTime]);
+
   const handleStartTreeHoleChat = (npcId: string, npcName: string, npcAvatar: string, context?: string, authorPersona?: string) => {
     // Create a temporary persona for this NPC if it doesn't exist
     if (!treeHolePersonas.find(p => p.id === npcId)) {
@@ -1246,6 +1334,34 @@ export default function App() {
     
     const targetPersona = personas.find(p => p.id === personaId);
     
+    // Check if user has blocked AI
+    if (targetPersona?.isBlockedByUser) {
+      const blockedMsg: Message = {
+        id: Date.now().toString(),
+        personaId: personaId,
+        role: 'user',
+        text,
+        msgType: 'text',
+        timestamp: new Date().toLocaleTimeString(),
+        createdAt: Date.now(),
+        status: 'sent',
+        isRead: false
+      };
+      
+      const systemErrorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        personaId: personaId,
+        role: 'system',
+        text: '你已将对方加入黑名单，无法发送消息。',
+        msgType: 'system',
+        timestamp: new Date().toLocaleTimeString(),
+        createdAt: Date.now() + 1
+      };
+      
+      setMessages(prev => [...prev, blockedMsg, systemErrorMsg]);
+      return;
+    }
+
     // Check if AI has blocked user
     if (targetPersona?.hasBlockedUser) {
       const blockedMsg: Message = {
@@ -1861,11 +1977,16 @@ export default function App() {
             className="absolute top-0 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[448px] bg-white/80 backdrop-blur-xl rounded-2xl p-3 shadow-lg z-[100] flex items-center gap-3 cursor-pointer border border-white/50"
             onClick={() => {
               if (notification.personaId) {
-                setCurrentChatId(notification.personaId);
+                if (notification.title.includes('小红书')) {
+                  setXhsInitialActiveChatAuthorId(notification.personaId);
+                  setCurrentScreen('xhs');
+                } else {
+                  setCurrentChatId(notification.personaId);
+                  setCurrentScreen('chat');
+                }
               }
               setNotification(null);
               setIsLocked(false);
-              setCurrentScreen('chat');
             }}
           >
             <img src={personas.find(p => p.id === notification.personaId)?.avatarUrl || personas[0]?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'} className="w-10 h-10 rounded-xl object-cover shrink-0" alt="avatar" />
@@ -1920,7 +2041,12 @@ export default function App() {
                   className="w-full h-full absolute inset-0"
                 >
                   <HomeScreen 
-                    onNavigate={setCurrentScreen} 
+                    onNavigate={(screen) => {
+                      if (screen === 'xhs') {
+                        setXhsInitialActiveChatAuthorId(null);
+                      }
+                      setCurrentScreen(screen);
+                    }} 
                     onLock={() => setIsLocked(true)}
                     theme={theme} 
                     setTheme={setTheme}
@@ -2086,6 +2212,7 @@ export default function App() {
                     onRefresh={handleXhsRefresh}
                     isRefreshing={isGeneratingXhs}
                     onAddPersona={handleAddPersona}
+                    initialActiveChatAuthorId={xhsInitialActiveChatAuthorId}
                   />
                 </motion.div>
               )}
@@ -2291,6 +2418,24 @@ export default function App() {
                 </motion.div>
               )}
 
+              {currentScreen === 'phone' && (
+                <motion.div
+                  key="phone"
+                  initial={{ opacity: 0, x: '100%' }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: '100%' }}
+                  transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
+                  className="w-full h-full absolute inset-0 z-20 bg-white"
+                >
+                  <PhoneScreen 
+                    onBack={() => setCurrentScreen('home')}
+                    callHistory={callHistory}
+                    personas={personas}
+                    onStartCall={(personaId) => setActiveCall({ personaId, type: 'outgoing' })}
+                  />
+                </motion.div>
+              )}
+
               {currentScreen === 'chat' && (
                 <motion.div
                   key="chat"
@@ -2342,6 +2487,33 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Active Call Screen */}
+      <AnimatePresence>
+        {activeCall && (
+          <div className="absolute inset-0 z-[10000]">
+            <ActiveCallScreen
+              persona={personas.find(p => p.id === activeCall.personaId)!}
+              type={activeCall.type}
+              onEndCall={(duration, wasMissed) => {
+                setCallHistory(prev => [{
+                  id: Date.now().toString(),
+                  personaId: activeCall.personaId,
+                  type: activeCall.type === 'incoming' ? (wasMissed ? 'missed' : 'incoming') : 'outgoing',
+                  startTime: Date.now() - duration * 1000,
+                  duration
+                }, ...prev]);
+                setActiveCall(null);
+              }}
+              apiSettings={apiSettings}
+              worldbook={worldbook}
+              userProfile={userProfile}
+              aiRef={aiRef}
+              setPersonas={setPersonas}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* AI Phone Request Modal */}
       <AnimatePresence>
         {aiPhoneRequest && (

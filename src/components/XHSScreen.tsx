@@ -16,8 +16,8 @@ interface Props {
   setBlockedAuthorIds: React.Dispatch<React.SetStateAction<string[]>>;
   onShareToChat: (post: XHSPost, personaId: string) => void;
   onShareToMoments: (post: XHSPost) => void;
-  privateChats: Record<string, { text: string, isMe: boolean, time: number }[]>;
-  setPrivateChats: React.Dispatch<React.SetStateAction<Record<string, { text: string, isMe: boolean, time: number }[]>>>;
+  privateChats: Record<string, { text: string, isMe: boolean, time: number, isSystem?: boolean }[]>;
+  setPrivateChats: React.Dispatch<React.SetStateAction<Record<string, { text: string, isMe: boolean, time: number, isSystem?: boolean }[]>>>;
   apiSettings: ApiSettings;
   worldbook: WorldbookSettings;
   aiRef: React.MutableRefObject<GoogleGenAI | null>;
@@ -28,6 +28,7 @@ interface Props {
   isRefreshing?: boolean;
   onAddPersona: (persona: Persona) => void;
   setPersonas?: React.Dispatch<React.SetStateAction<Persona[]>>;
+  initialActiveChatAuthorId?: string | null;
 }
 
 const MARKET_ITEMS = [
@@ -89,9 +90,10 @@ export function XHSScreen({
   onRefresh,
   isRefreshing = false,
   onAddPersona,
-  setPersonas
+  setPersonas,
+  initialActiveChatAuthorId
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'square' | 'market' | 'messages' | 'me'>('square');
+  const [activeTab, setActiveTab] = useState<'square' | 'market' | 'messages' | 'me'>(initialActiveChatAuthorId ? 'messages' : 'square');
   const [squareTab, setSquareTab] = useState<'following' | 'discover' | 'nearby'>('discover');
   const [meSubTab, setMeSubTab] = useState<'posts' | 'bookmarks'>('posts');
   const [marketTab, setMarketTab] = useState<'recommend' | 'handmade' | 'vintage'>('recommend');
@@ -99,7 +101,7 @@ export function XHSScreen({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedMarketItemId, setSelectedMarketItemId] = useState<string | null>(null);
   const [viewingAuthorId, setViewingAuthorId] = useState<string | null>(null);
-  const [activeChatAuthorId, setActiveChatAuthorId] = useState<string | null>(null);
+  const [activeChatAuthorId, setActiveChatAuthorId] = useState<string | null>(initialActiveChatAuthorId || null);
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostImages, setNewPostImages] = useState<string[]>([]);
@@ -109,6 +111,13 @@ export function XHSScreen({
   const [sharingPost, setSharingPost] = useState<XHSPost | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialActiveChatAuthorId) {
+      setActiveTab('messages');
+      setActiveChatAuthorId(initialActiveChatAuthorId);
+    }
+  }, [initialActiveChatAuthorId]);
 
   const selectedPost = posts.find(p => p.id === selectedPostId);
   
@@ -177,6 +186,20 @@ export function XHSScreen({
       isMe: true,
       time: Date.now()
     };
+
+    const isBlockedByMe = blockedAuthorIds.includes(activeChatAuthorId);
+    if (isBlockedByMe) {
+      setPrivateChats(prev => ({
+        ...prev,
+        [activeChatAuthorId]: [
+          ...(prev[activeChatAuthorId] || []), 
+          newMessage,
+          { text: '你已将对方拉黑，无法发送消息。', isMe: false, time: Date.now() + 1, isSystem: true }
+        ]
+      }));
+      setPrivateMessageText('');
+      return;
+    }
 
     setPrivateChats(prev => ({
       ...prev,
@@ -1167,13 +1190,14 @@ export function XHSScreen({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-50">
               {(privateChats[activeChatAuthorId] || []).map((msg, i) => (
-                <div key={i} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
+                <div key={i} className={`flex ${msg.isSystem ? 'justify-center' : msg.isMe ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] p-3 rounded-2xl text-sm ${
+                    msg.isSystem ? 'bg-neutral-200/50 text-neutral-500 text-xs py-1 px-3 rounded-full' :
                     msg.isMe ? 'bg-red-500 text-white rounded-tr-none' : 'bg-white text-neutral-800 rounded-tl-none shadow-sm'
                   }`}>
                     {msg.text}
                     
-                    {!msg.isMe && msg.text.includes('微信') && !personas.find(p => p.id === activeChatAuthorId) && (
+                    {!msg.isMe && !msg.isSystem && msg.text.includes('微信') && !personas.find(p => p.id === activeChatAuthorId) && (
                       <div className="mt-2 pt-2 border-t border-neutral-100">
                         <button 
                           onClick={() => {

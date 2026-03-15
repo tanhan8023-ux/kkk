@@ -16,7 +16,6 @@ export interface Persona {
   patSuffix?: string;
   isSegmentResponse?: boolean;
   allowActiveMessaging?: boolean;
-  isBlocked?: boolean;
   mood?: string;
   context?: string;
   statusMessage?: string;
@@ -400,7 +399,15 @@ export interface Order {
   orderFor?: string; // 'me' or personaId
 }
 
-export type Screen = 'home' | 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'lovewidget' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera';
+export interface CallRecord {
+  id: string;
+  personaId: string;
+  type: 'incoming' | 'outgoing' | 'missed';
+  startTime: number;
+  duration: number; // in seconds
+}
+
+export type Screen = 'home' | 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'lovewidget' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera' | 'phone';
 
 
 

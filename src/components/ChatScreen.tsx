@@ -389,7 +389,7 @@ export function ChatScreen({
       // 20% chance to post if time is up
       if (Math.random() > 0.2) return;
 
-      const activePersonas = personas.filter(p => !p.isBlocked);
+      const activePersonas = personas.filter(p => !p.isBlockedByUser);
       if (activePersonas.length === 0) return;
 
       const randomPersona = activePersonas[Math.floor(Math.random() * activePersonas.length)];
@@ -1323,7 +1323,7 @@ export function ChatScreen({
     setActiveMessageMenu(null);
 
     // If user recalled a message, notify AI
-    if (msg.role === 'user' && currentPersona && !currentPersona.isBlocked) {
+    if (msg.role === 'user' && currentPersona && !currentPersona.isBlockedByUser) {
       pendingRequests.current += 1;
       setIsTyping(pendingRequests.current > 0);
       try {
@@ -1792,7 +1792,7 @@ ${recentMessages}
 
   const handleBlockPersona = () => {
     if (currentChatId) {
-      setPersonas(prev => prev.map(p => p.id === currentChatId ? { ...p, isBlocked: !p.isBlocked } : p));
+      setPersonas(prev => prev.map(p => p.id === currentChatId ? { ...p, isBlockedByUser: !p.isBlockedByUser } : p));
       setShowChatSettings(false);
     }
   };
@@ -2131,7 +2131,7 @@ ${recentMessages}
                     <UserPlus size={16} className="rotate-45" /> 删除好友
                   </div>
                   <div onClick={handleBlockPersona} className="px-4 py-2 text-[14px] text-red-500 flex items-center gap-2 active:bg-neutral-100 cursor-pointer">
-                    <Ban size={16} /> {currentPersona?.isBlocked ? '解除拉黑' : '拉黑'}
+                    <Ban size={16} /> {currentPersona?.isBlockedByUser ? '解除拉黑' : '拉黑'}
                   </div>
                 </div>
               )}
@@ -2300,7 +2300,7 @@ ${recentMessages}
                 </div>
                 <div className="flex-1 flex items-center justify-between">
                   <h3 className="text-[16px] font-medium text-neutral-900">{p.name}</h3>
-                  {p.isBlocked && <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">已拉黑</span>}
+                  {p.isBlockedByUser && <span className="text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">已拉黑</span>}
                 </div>
               </div>
             ))}
@@ -2943,9 +2943,9 @@ ${recentMessages}
               className="bg-neutral-100 border-t border-neutral-200 shrink-0"
               style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             >
-              {currentPersona?.isBlocked ? (
+              {currentPersona?.isBlockedByUser ? (
                 <div className="p-4 text-center text-neutral-400 text-sm">
-                  对方已将你拉黑，无法发送消息
+                  你已将对方加入黑名单，无法发送消息
                 </div>
               ) : (
                 <>
@@ -3016,7 +3016,7 @@ ${recentMessages}
               </div>
             </>
           )}
-          {showStickerMenu && !currentPersona?.isBlocked && (
+          {showStickerMenu && !currentPersona?.isBlockedByUser && (
             <div className="h-48 border-t border-neutral-200 bg-neutral-100 p-4 overflow-y-auto grid grid-cols-4 gap-4 z-50 relative">
               <div className="col-span-4 flex justify-end">
                 <button 
@@ -3083,7 +3083,7 @@ ${recentMessages}
               </button>
             </div>
           )}
-          {showPlusMenu && !currentPersona?.isBlocked && (
+          {showPlusMenu && !currentPersona?.isBlockedByUser && (
             <div className="border-t border-neutral-200 bg-neutral-100 p-6 grid grid-cols-4 gap-y-6 gap-x-4">
               <button 
                 onClick={() => {

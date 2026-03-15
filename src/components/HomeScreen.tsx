@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MessageCircle, Book, Music, Hash, HeartPulse, Sprout, Truck, MoreHorizontal, Settings, Lock, Palette, Mic, Image as ImageIcon, PlusCircle, Smile, CloudSun, Heart, Sun, ShoppingBag, Cloud, CloudRain, CloudLightning, CloudSnow, CloudDrizzle, CloudFog, RefreshCw, Utensils, Smartphone, Minus, Plus, LayoutGrid, X, Upload, Type, RefreshCcw, Download, Calendar as CalendarIcon, FileText, Camera as CameraIcon, Wallet } from 'lucide-react';
+import { MessageCircle, Book, Music, Hash, HeartPulse, Sprout, Truck, MoreHorizontal, Settings, Lock, Palette, Mic, Image as ImageIcon, PlusCircle, Smile, CloudSun, Heart, Sun, ShoppingBag, Cloud, CloudRain, CloudLightning, CloudSnow, CloudDrizzle, CloudFog, RefreshCw, Utensils, Smartphone, Minus, Plus, LayoutGrid, X, Upload, Type, RefreshCcw, Download, Calendar as CalendarIcon, FileText, Camera as CameraIcon, Wallet, Phone } from 'lucide-react';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { motion, AnimatePresence } from 'motion/react';
 import { ThemeSettings, UserProfile, Song } from '../types';
@@ -244,6 +244,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
     { type: 'app-bartender', label: '调酒师', w: 1, h: 1, icon: Heart },
     { type: 'app-aiphones', label: 'AI分身', w: 1, h: 1, icon: Smartphone },
     { type: 'app-photoalbum', label: '相册', w: 1, h: 1, icon: ImageIcon },
+    { type: 'app-phone', label: '电话', w: 1, h: 1, icon: Phone },
     { type: 'love-widget', label: '恋爱组件', w: 4, h: 2, icon: Heart },
     { type: 'acrylic-stand', label: '立牌组件', w: 4, h: 2, icon: ImageIcon },
   ];
@@ -1011,6 +1012,8 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="aiphones" icon={Smartphone} label="AI分身" onClick={() => onNavigate('aiphones')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('aiphones'); setShowIconEditModal(true); }} /></div>;
       case 'app-photoalbum':
         return <div className="w-full h-full flex items-center justify-center"><AppIcon id="photoalbum" icon={ImageIcon} label="相册" onClick={() => onNavigate('photoalbum')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('photoalbum'); setShowIconEditModal(true); }} /></div>;
+      case 'app-phone':
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="phone" icon={Phone} label="电话" onClick={() => onNavigate('phone')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('phone'); setShowIconEditModal(true); }} /></div>;
       default:
         return null;
     }

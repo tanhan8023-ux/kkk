@@ -47,7 +47,7 @@ export const ChatListView = ({ personas, messages, userProfile, setCurrentChatId
             <div className="flex justify-between items-center">
               <h3 className="text-[16px] font-medium text-neutral-900">
                 {p.name}
-                {p.isBlocked && <span className="ml-2 text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">已拉黑</span>}
+                {p.isBlockedByUser && <span className="ml-2 text-[10px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">已拉黑</span>}
               </h3>
               <span className="text-[12px] text-neutral-400">
                 {lastMsg ? formatRelativeTime(lastMsg.createdAt) : ''}
