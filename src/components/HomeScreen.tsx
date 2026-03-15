@@ -157,6 +157,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
   const [dynamicStatusBgInput, setDynamicStatusBgInput] = useState('');
   const [loveWidgetInput, setLoveWidgetInput] = useState({ avatar1: '', avatar2: '', bgImage: '', name1: '', name2: '', bottomMessage: '', startDate: '' });
   const [activeIconId, setActiveIconId] = useState<string | null>(null);
+  const [showIconEditModal, setShowIconEditModal] = useState(false);
   const [foodRoulette, setFoodRoulette] = useState<{spinning: boolean, result: string | null}>({spinning: false, result: null});
   const imageInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -202,9 +203,23 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
               [activeIconId]: event.target?.result as string
             }
           }));
+          setShowIconEditModal(false);
+          setActiveIconId(null);
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRestoreDefaultIcon = () => {
+    if (activeIconId) {
+      setTheme(prev => {
+        const newIcons = { ...(prev.customIcons || {}) };
+        delete newIcons[activeIconId];
+        return { ...prev, customIcons: newIcons };
+      });
+      setShowIconEditModal(false);
+      setActiveIconId(null);
     }
   };
 
@@ -977,25 +992,25 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           </div>
         );
       case 'app-chat':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="chat" icon={MessageCircle} label="微信" onClick={() => onNavigate('chat')} theme={theme} badge={unreadCount} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('chat'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="chat" icon={MessageCircle} label="微信" onClick={() => onNavigate('chat')} theme={theme} badge={unreadCount} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('chat'); setShowIconEditModal(true); }} /></div>;
       case 'app-persona':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="persona" icon={Book} label="世界书" onClick={() => onNavigate('persona')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('persona'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="persona" icon={Book} label="世界书" onClick={() => onNavigate('persona')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('persona'); setShowIconEditModal(true); }} /></div>;
       case 'app-music':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="music" icon={Music} label="音乐" onClick={() => onNavigate('music')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('music'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="music" icon={Music} label="音乐" onClick={() => onNavigate('music')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('music'); setShowIconEditModal(true); }} /></div>;
       case 'app-xhs':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="xhs" icon={Hash} label="小红书" onClick={() => onNavigate('xhs')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('xhs'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="xhs" icon={Hash} label="小红书" onClick={() => onNavigate('xhs')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('xhs'); setShowIconEditModal(true); }} /></div>;
       case 'app-treehole':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="treehole" icon={Smile} label="树洞" onClick={() => onNavigate('treehole')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('treehole'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="treehole" icon={Smile} label="树洞" onClick={() => onNavigate('treehole')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('treehole'); setShowIconEditModal(true); }} /></div>;
       case 'app-taobao':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="taobao" icon={ShoppingBag} label="淘宝" onClick={() => onNavigate('taobao')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('taobao'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="taobao" icon={ShoppingBag} label="淘宝" onClick={() => onNavigate('taobao')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('taobao'); setShowIconEditModal(true); }} /></div>;
       case 'app-fooddelivery':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="fooddelivery" icon={Utensils} label="外卖" onClick={() => onNavigate('fooddelivery')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('fooddelivery'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="fooddelivery" icon={Utensils} label="外卖" onClick={() => onNavigate('fooddelivery')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('fooddelivery'); setShowIconEditModal(true); }} /></div>;
       case 'app-bartender':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="bartender" icon={Heart} label="调酒师" onClick={() => onNavigate('bartender')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('bartender'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="bartender" icon={Heart} label="调酒师" onClick={() => onNavigate('bartender')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('bartender'); setShowIconEditModal(true); }} /></div>;
       case 'app-aiphones':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="aiphones" icon={Smartphone} label="AI分身" onClick={() => onNavigate('aiphones')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('aiphones'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="aiphones" icon={Smartphone} label="AI分身" onClick={() => onNavigate('aiphones')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('aiphones'); setShowIconEditModal(true); }} /></div>;
       case 'app-photoalbum':
-        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="photoalbum" icon={ImageIcon} label="相册" onClick={() => onNavigate('photoalbum')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('photoalbum'); iconInputRef.current?.click(); }} /></div>;
+        return <div className="w-full h-full flex items-center justify-center"><AppIcon id="photoalbum" icon={ImageIcon} label="相册" onClick={() => onNavigate('photoalbum')} theme={theme} isEditingLayout={isEditingLayout} onLongPress={() => setIsEditingLayout(true)} onEditIcon={() => { setActiveIconId('photoalbum'); setShowIconEditModal(true); }} /></div>;
       default:
         return null;
     }
@@ -1004,7 +1019,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
   return (
     <div 
       className={`w-full h-full pb-[env(safe-area-inset-bottom)] flex flex-col overflow-hidden relative`}
-      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)' }}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'max(3rem, env(safe-area-inset-top))' }}
       onPointerDown={(e) => {
         // Only trigger on the background, not on children
         if (e.target === e.currentTarget) {
@@ -1126,7 +1141,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
       {/* Dock */}
       <div className="mt-auto h-[60px] mx-5 bg-white/50 backdrop-blur-2xl rounded-[2rem] flex items-center justify-around px-6 shadow-sm border border-white/40 shrink-0">
         <button 
-          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_settings'); iconInputRef.current?.click(); })() : onNavigate('api')} 
+          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_settings'); setShowIconEditModal(true); })() : onNavigate('api')} 
           className={`w-11 h-11 bg-black/20 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform overflow-hidden relative ${isEditingLayout ? 'animate-pulse' : ''}`}
         >
           {theme.customIcons?.['dock_settings'] ? (
@@ -1141,7 +1156,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           )}
         </button>
         <button 
-          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_layout'); iconInputRef.current?.click(); })() : setIsEditingLayout(true)} 
+          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_layout'); setShowIconEditModal(true); })() : setIsEditingLayout(true)} 
           className={`w-11 h-11 bg-black/20 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform overflow-hidden relative ${isEditingLayout ? 'animate-pulse' : ''}`}
         >
           {theme.customIcons?.['dock_layout'] ? (
@@ -1156,7 +1171,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           )}
         </button>
         <button 
-          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_lock'); iconInputRef.current?.click(); })() : onLock()} 
+          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_lock'); setShowIconEditModal(true); })() : onLock()} 
           className={`w-11 h-11 bg-black/20 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform overflow-hidden relative ${isEditingLayout ? 'animate-pulse' : ''}`}
         >
           {theme.customIcons?.['dock_lock'] ? (
@@ -1171,7 +1186,7 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           )}
         </button>
         <button 
-          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_theme'); iconInputRef.current?.click(); })() : onNavigate('theme')} 
+          onClick={() => isEditingLayout ? (() => { setActiveIconId('dock_theme'); setShowIconEditModal(true); })() : onNavigate('theme')} 
           className={`w-11 h-11 bg-black/20 rounded-full flex items-center justify-center text-white active:scale-95 transition-transform overflow-hidden relative ${isEditingLayout ? 'animate-pulse' : ''}`}
         >
           {theme.customIcons?.['dock_theme'] ? (
@@ -1252,6 +1267,38 @@ export function HomeScreen({ onNavigate, onLock, theme, setTheme, unreadCount, u
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Icon Edit Modal */}
+      {showIconEditModal && (
+        <div className="absolute inset-0 bg-black/50 z-[200] flex items-center justify-center p-6" onClick={() => setShowIconEditModal(false)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[280px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-6 text-center text-neutral-800">编辑图标</h3>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={() => iconInputRef.current?.click()}
+                className="w-full py-3.5 bg-blue-500 text-white font-semibold rounded-2xl active:scale-95 transition-transform flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+              >
+                <Upload size={18} /> 更换图标图片
+              </button>
+              
+              <button 
+                onClick={handleRestoreDefaultIcon}
+                className="w-full py-3.5 bg-neutral-100 text-neutral-700 font-semibold rounded-2xl active:scale-95 transition-transform flex items-center justify-center gap-2"
+              >
+                <RefreshCcw size={18} /> 恢复默认图标
+              </button>
+              
+              <button 
+                onClick={() => setShowIconEditModal(false)}
+                className="w-full py-3.5 text-neutral-400 font-medium active:opacity-70 transition-opacity mt-2"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Anniversary Widget Edit Modal */}
       {editingWidget === 'anniversary' && (

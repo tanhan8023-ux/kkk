@@ -2040,7 +2040,7 @@ ${recentMessages}
   return (
     <div 
       className={`w-full h-full bg-neutral-100 flex flex-col`}
-      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'env(safe-area-inset-top)' }}
+      style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'max(3rem, env(safe-area-inset-top))' }}
     >
       {/* Header */}
       <div className="h-12 flex items-center px-2 bg-neutral-100 border-b border-neutral-200 shrink-0 z-[70]">
