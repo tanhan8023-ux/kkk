@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronDown, Play, Pause, SkipBack, SkipForward, 
   ListMusic, Plus, Share, MoreHorizontal, Music, Trash2, FolderPlus, Folder, Users, X, Heart,
-  Minimize2, Maximize2, Image as ImageIcon
+  Minimize2, Maximize2, Image as ImageIcon, Upload
 } from 'lucide-react';
 import { Song, Persona, Playlist, Message, ApiSettings, WorldbookSettings, UserProfile, ThemeSettings } from '../types';
 import { fetchAiResponse } from '../services/aiService';
@@ -592,12 +592,11 @@ export function MusicScreen({
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            title="导入音乐"
+            className="p-2 bg-neutral-800 rounded-full hover:bg-neutral-700 transition-colors"
+            title="上传音乐"
           >
-            <Plus className="w-6 h-6" />
+            <Upload size={20} />
           </button>
-        </div>
         <input 
           type="file" 
           ref={bgInputRef} 
@@ -611,12 +610,23 @@ export function MusicScreen({
         <input 
           type="file" 
           ref={fileInputRef} 
-          onChange={handleFileChange} 
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const newSong: Song = {
+              id: Date.now().toString(),
+              title: file.name.split('.')[0],
+              artist: '未知艺术家',
+              url: '', 
+              cover: 'https://picsum.photos/seed/default/100/100'
+            };
+            onAddSong(newSong, file);
+          }}
           accept="audio/*" 
-          multiple 
           className="hidden" 
         />
       </div>
+    </div>
 
       {/* Main Content */}
       <div ref={constraintsRef} className="relative z-10 flex-1 flex flex-col items-center min-h-0 w-full overflow-hidden">

@@ -214,7 +214,7 @@ export interface Song {
   title: string;
   artist: string;
   cover: string;
-  lyrics: string;
+  lyrics?: string;
   url?: string;
   duration?: number;
   source?: 'netease' | 'qq' | 'local';
