@@ -801,6 +801,7 @@ export default function App() {
   useEffect(() => { debouncedSave('treeHolePersonas', treeHolePersonas); }, [treeHolePersonas, isReady]);
   useEffect(() => { debouncedSave('treeHolePosts', treeHolePosts); }, [treeHolePosts, isReady]);
   useEffect(() => { debouncedSave('treeHoleNotifications', treeHoleNotifications); }, [treeHoleNotifications, isReady]);
+  useEffect(() => { debouncedSave('callHistory', callHistory); }, [callHistory, isReady]);
   useEffect(() => { debouncedSave('followedAuthorIds', followedAuthorIds); }, [followedAuthorIds, isReady]);
   useEffect(() => { debouncedSave('blockedAuthorIds', blockedAuthorIds); }, [blockedAuthorIds, isReady]);
   useEffect(() => { debouncedSave('orders', orders); }, [orders, isReady]);

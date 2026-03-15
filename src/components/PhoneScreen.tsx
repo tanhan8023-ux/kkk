@@ -32,7 +32,7 @@ export function PhoneScreen({ personas, callHistory, onBack, onStartCall }: Prop
   };
 
   return (
-    <div className="flex flex-col h-full bg-white text-black">
+    <div className="flex flex-col h-full bg-white text-black pt-[calc(3.5rem+env(safe-area-inset-top))]">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-100">
         <button onClick={onBack} className="p-2 -ml-2 text-blue-500 hover:bg-blue-50 rounded-full transition-colors">
