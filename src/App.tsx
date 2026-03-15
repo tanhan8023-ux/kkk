@@ -60,7 +60,7 @@ import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Mome
 import { AnimatePresence, motion } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { storageService } from './services/storageService';
-import { fetchAiResponse, generatePersonaStatus, checkIfPersonaIsOffline, generateUserRemark, generateDiaryEntry } from './services/aiService';
+import { fetchAiResponse, generatePersonaStatus, checkIfPersonaIsOffline, generateUserRemark, generateDiaryEntry, generateXHSPost } from './services/aiService';
 import { lyricService } from './services/lyricService';
 import { repairJson } from './utils';
 
@@ -481,8 +481,126 @@ export default function App() {
       comments: 0,
       commentsList: [],
       createdAt: Date.now() - 21600000
+    },
+    {
+      id: 'xhs5',
+      authorId: 'npc3',
+      authorName: '美食探店达人',
+      authorAvatar: 'https://picsum.photos/seed/foodie/100/100',
+      title: '这家隐藏在巷子里的私房菜，绝了！🥘',
+      content: '真的没想到在这么偏僻的地方能吃到这么正宗的味道！强烈推荐他们家的招牌红烧肉，入口即化！😋 #美食探店 #私房菜 #吃货日常',
+      images: ['https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80'],
+      likes: 892,
+      comments: 12,
+      commentsList: [],
+      createdAt: Date.now() - 25200000
+    },
+    {
+      id: 'xhs6',
+      authorId: 'npc4',
+      authorName: '旅行摄影师',
+      authorAvatar: 'https://picsum.photos/seed/travel/100/100',
+      title: '大理的云，看一万次都不会腻。☁️',
+      content: '在洱海边坐了一下午，什么都不干，就看云卷云舒。这才是向往的生活吧。✨ #大理旅行 #洱海 #治愈系风景',
+      images: ['https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80'],
+      likes: 1540,
+      comments: 34,
+      commentsList: [],
+      createdAt: Date.now() - 32400000
+    },
+    {
+      id: 'xhs7',
+      authorId: 'npc5',
+      authorName: '穿搭博主A',
+      authorAvatar: 'https://picsum.photos/seed/fashion/100/100',
+      title: '早秋第一套OOTD｜美拉德风穿搭🍂',
+      content: '秋天到了，棕色系穿搭真的太有氛围感了！这件毛衣质感绝绝子，爱了爱了！🧥 #早秋穿搭 #美拉德 #OOTD',
+      images: ['https://images.unsplash.com/photo-1434389677669-e08b4cac3105?auto=format&fit=crop&w=800&q=80'],
+      likes: 670,
+      comments: 8,
+      commentsList: [],
+      createdAt: Date.now() - 43200000
+    },
+    {
+      id: 'xhs8',
+      authorId: 'npc6',
+      authorName: '深夜食堂',
+      authorAvatar: 'https://picsum.photos/seed/night/100/100',
+      title: '加班后的这一碗面，治愈了所有疲惫。🍜',
+      content: '凌晨两点的街道，只有这家面馆还亮着灯。热气腾腾的面汤下肚，感觉又活过来了。加班狗的日常。💪 #深夜食堂 #加班日常 #治愈系美食',
+      images: ['https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80'],
+      likes: 430,
+      comments: 5,
+      commentsList: [],
+      createdAt: Date.now() - 54000000
     }
   ]);
+
+  const [isGeneratingXhs, setIsGeneratingXhs] = useState(false);
+
+  useEffect(() => {
+    if (apiSettings.apiKey) {
+      aiRef.current = new GoogleGenAI({ apiKey: apiSettings.apiKey });
+    }
+  }, [apiSettings.apiKey]);
+
+  // Background XHS Post Generation
+  useEffect(() => {
+    if (!isReady || !hasApiKey) return;
+
+    const interval = setInterval(async () => {
+      // 10% chance to generate a new post every 2 minutes
+      if (Math.random() > 0.1) return;
+      
+      try {
+        const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
+        const newPost: XHSPost = {
+          id: `xhs-gen-${Date.now()}`,
+          authorId: `npc-gen-${Math.random().toString(36).substr(2, 9)}`,
+          authorName: newPostData.authorName,
+          authorAvatar: newPostData.authorAvatar,
+          title: newPostData.title,
+          content: newPostData.content,
+          images: newPostData.images,
+          likes: Math.floor(Math.random() * 100),
+          comments: 0,
+          commentsList: [],
+          createdAt: Date.now()
+        };
+        setXhsPosts(prev => [newPost, ...prev]);
+      } catch (e) {
+        console.error("Failed to generate background XHS post:", e);
+      }
+    }, 120000); // Check every 2 minutes
+
+    return () => clearInterval(interval);
+  }, [isReady, hasApiKey, apiSettings, worldbook, userProfile]);
+
+  const handleXhsRefresh = async () => {
+    if (isGeneratingXhs || !hasApiKey) return;
+    setIsGeneratingXhs(true);
+    try {
+      const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
+      const newPost: XHSPost = {
+        id: `xhs-gen-${Date.now()}`,
+        authorId: `npc-gen-${Math.random().toString(36).substr(2, 9)}`,
+        authorName: newPostData.authorName,
+        authorAvatar: newPostData.authorAvatar,
+        title: newPostData.title,
+        content: newPostData.content,
+        images: newPostData.images,
+        likes: Math.floor(Math.random() * 100),
+        comments: 0,
+        commentsList: [],
+        createdAt: Date.now()
+      };
+      setXhsPosts(prev => [newPost, ...prev]);
+    } catch (e) {
+      console.error("Failed to refresh XHS posts:", e);
+    } finally {
+      setIsGeneratingXhs(false);
+    }
+  };
 
   // Initialization
   useEffect(() => {
@@ -1842,6 +1960,8 @@ export default function App() {
                     onBack={() => setCurrentScreen('home')} 
                     messages={messages}
                     theme={theme}
+                    onRefresh={handleXhsRefresh}
+                    isRefreshing={isGeneratingXhs}
                   />
                 </motion.div>
               )}

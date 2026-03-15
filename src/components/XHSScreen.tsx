@@ -24,6 +24,8 @@ interface Props {
   onBack: () => void;
   messages: Message[];
   theme: ThemeSettings;
+  onRefresh?: () => Promise<void>;
+  isRefreshing?: boolean;
 }
 
 const MARKET_ITEMS = [
@@ -53,7 +55,9 @@ export function XHSScreen({
   aiRef,
   onBack,
   messages,
-  theme
+  theme,
+  onRefresh,
+  isRefreshing = false
 }: Props) {
   const [activeTab, setActiveTab] = useState<'square' | 'market' | 'messages' | 'me'>('square');
   const [squareTab, setSquareTab] = useState<'following' | 'discover' | 'nearby'>('discover');
@@ -291,11 +295,25 @@ export function XHSScreen({
                 关注
               </button>
               <button 
-                onClick={() => setSquareTab('discover')}
+                onClick={() => {
+                  if (squareTab === 'discover' && onRefresh) {
+                    onRefresh();
+                  }
+                  setSquareTab('discover');
+                }}
                 className={`text-[17px] transition-colors relative py-2 ${squareTab === 'discover' ? 'text-neutral-900 font-bold' : 'text-neutral-400 font-medium'}`}
               >
                 发现
                 {squareTab === 'discover' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-red-500 rounded-full" />}
+                {isRefreshing && squareTab === 'discover' && (
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                    className="absolute -right-5 top-1/2 -translate-y-1/2 text-red-500"
+                  >
+                    <Compass size={14} />
+                  </motion.div>
+                )}
               </button>
               <button 
                 onClick={() => setSquareTab('nearby')}

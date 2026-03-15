@@ -394,6 +394,80 @@ ${(persona.prompts || []).join('\n')}
   return { content, imageUrl };
 }
 
+export async function generateXHSPost(
+  apiSettings: ApiSettings,
+  worldbook: WorldbookSettings,
+  userProfile: UserProfile,
+  aiRef: React.MutableRefObject<GoogleGenAI | null>,
+  topic?: string
+): Promise<{ title: string; content: string; images: string[]; authorName: string; authorAvatar: string }> {
+  const prompt = `你现在是一个活跃在小红书（Little Red Book/Xiaohongshu）上的博主。请生成一篇极具小红书风格的帖子。
+${topic ? `主题：${topic}` : '主题：随机（可以是穿搭、美食、旅游、心情、好物分享、职场吐槽等）'}
+
+要求：
+1. **标题**：吸引人，带表情符号，如“救命！这家店也太好吃了叭😭”、“今日份OOTD｜温柔系穿搭✨”。
+2. **正文**：
+   - 语气活泼、亲切，多用“宝子们”、“家人们”、“绝绝子”、“真的哭死”等小红书常用语。
+   - 适当分段，多用表情符号。
+   - 包含相关的标签（Hashtags），如 #小红书成长笔记 #我的日常 #好物分享。
+3. **作者信息**：
+   - authorName: 起一个好听的、符合小红书审美的昵称。
+   - authorAvatar: 描述一个头像的画面（用于生成头像）。
+4. **配图描述**：
+   - imagePrompt: 描述一张符合帖子内容的、高质量的、有氛围感的照片。
+5. **JSON格式输出**：
+   - title: 标题
+   - content: 正文
+   - authorName: 昵称
+   - authorAvatarPrompt: 头像描述
+   - imagePrompt: 配图描述
+
+直接输出 JSON，不要有任何其他解释。`;
+
+  const { responseText } = await fetchAiResponse(
+    prompt,
+    [],
+    { id: 'xhs_generator', name: '小红书助手', instructions: '你是一个专业的小红书文案专家。', prompt: '', prompts: [] },
+    apiSettings,
+    worldbook,
+    userProfile,
+    aiRef,
+    false,
+    "你是一个专门生成小红书内容的AI。请严格遵守 JSON 格式输出。",
+    undefined
+  );
+
+  try {
+    const jsonStr = responseText.match(/\{[\s\S]*\}/)?.[0] || responseText;
+    const data = JSON.parse(jsonStr);
+    
+    // Generate images in parallel
+    const [mainImage, avatarImage] = await Promise.all([
+      generateImage(data.imagePrompt || data.title, apiSettings.apiKey),
+      generateImage(`A beautiful profile picture for ${data.authorName}, ${data.authorAvatarPrompt || 'aesthetic avatar'}`, apiSettings.apiKey)
+    ]);
+
+    return {
+      title: data.title || "无题",
+      content: data.content || responseText,
+      images: [mainImage],
+      authorName: data.authorName || "匿名用户",
+      authorAvatar: avatarImage
+    };
+  } catch (e) {
+    console.error("Failed to parse XHS post JSON:", e);
+    const fallbackAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`;
+    const fallbackImage = `https://picsum.photos/seed/${Math.random()}/800/600`;
+    return {
+      title: "今日份小确幸 ✨",
+      content: responseText,
+      images: [fallbackImage],
+      authorName: "路人甲",
+      authorAvatar: fallbackAvatar
+    };
+  }
+}
+
 // Helper to describe image content in detail
 async function describeImage(imageUrl: string, providedApiKey?: string): Promise<string | null> {
   let apiKey = process.env.GEMINI_API_KEY || undefined;
