@@ -1988,7 +1988,7 @@ export default function App() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: '100%' }}
                   transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
-                  className="w-full h-full absolute inset-0 z-20 bg-white"
+                  className="w-full h-full absolute inset-0 z-20 bg-neutral-900"
                 >
                   <BartenderGame 
                     onBack={() => setCurrentScreen('home')}

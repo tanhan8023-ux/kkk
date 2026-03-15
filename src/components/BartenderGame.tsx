@@ -267,62 +267,67 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
 
   const rollDice = async () => {
     if (isRolling || isLoading) return;
+    setIsLoading(true);
     setIsRolling(true);
     setWinner(null);
     
-    // Animation effect
-    const interval = setInterval(() => {
-        setUserDice(Math.floor(Math.random() * 6) + 1);
-        setAiDice(Math.floor(Math.random() * 6) + 1);
-    }, 80);
+    try {
+      // Animation effect
+      const interval = setInterval(() => {
+          setUserDice(Math.floor(Math.random() * 6) + 1);
+          setAiDice(Math.floor(Math.random() * 6) + 1);
+      }, 80);
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    clearInterval(interval);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      clearInterval(interval);
 
-    const uDice = Math.floor(Math.random() * 6) + 1;
-    const aDice = Math.floor(Math.random() * 6) + 1;
-    
-    setUserDice(uDice);
-    setAiDice(aDice);
-    setIsRolling(false);
-    
-    // Highlight winner immediately
-    if (uDice > aDice) {
-        setWinner('user');
-    } else if (aDice > uDice) {
-        setWinner('ai');
-    } else {
-        setWinner(null);
-    }
-
-    // Wait for user to see the result
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    
-    setIsLoading(true);
-
-    if (uDice > aDice) {
-      const aiChoice = Math.random() > 0.5 ? 'drink' : 'truth';
+      const uDice = Math.floor(Math.random() * 6) + 1;
+      const aDice = Math.floor(Math.random() * 6) + 1;
       
-      if (aiChoice === 'drink') {
-          const text = await generateGameContent(`[系统提示：用户掷出了 ${uDice} 点，你掷出了 ${aDice} 点。用户赢了！你决定选择“大冒险/喝酒”。请表现出愿赌服输的样子，让用户为你调制一杯特饮。]`);
-          if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
-          setGameState('mixing');
+      setUserDice(uDice);
+      setAiDice(aDice);
+      setIsRolling(false);
+      
+      // Highlight winner immediately
+      if (uDice > aDice) {
+          setWinner('user');
+      } else if (aDice > uDice) {
+          setWinner('ai');
       } else {
-          const text = await generateGameContent(`[系统提示：用户掷出了 ${uDice} 点，你掷出了 ${aDice} 点。用户赢了！你决定选择“真心话”。请让用户问你一个问题。]`);
-          if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
-          setGameState('user-asking');
+          setWinner(null);
       }
-    } else if (aDice > uDice) {
-      const text = await generateGameContent(`[系统提示：你掷出了 ${aDice} 点，用户掷出了 ${uDice} 点。你赢了！请得意地让用户选择：是喝下你特制的“惩罚特饮”，还是选择“真心话”？]`);
-      if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
-      setGameState('decision');
-    } else {
-      setWinner(null);
-      const text = await generateGameContent(`[系统提示：平局（都是 ${uDice} 点）。请吐槽一下，并要求重新掷骰子。]`);
-      if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
+
+      // Wait for user to see the result
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
+      if (uDice > aDice) {
+        const aiChoice = Math.random() > 0.5 ? 'drink' : 'truth';
+        
+        if (aiChoice === 'drink') {
+            const text = await generateGameContent(`[系统提示：用户掷出了 ${uDice} 点，你掷出了 ${aDice} 点。用户赢了！你决定选择“大冒险/喝酒”。请表现出愿赌服输的样子，让用户为你调制一杯特饮。]`);
+            if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
+            setGameState('mixing');
+        } else {
+            const text = await generateGameContent(`[系统提示：用户掷出了 ${uDice} 点，你掷出了 ${aDice} 点。用户赢了！你决定选择“真心话”。请让用户问你一个问题。]`);
+            if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
+            setGameState('user-asking');
+        }
+      } else if (aDice > uDice) {
+        const text = await generateGameContent(`[系统提示：你掷出了 ${aDice} 点，用户掷出了 ${uDice} 点。你赢了！请得意地让用户选择：是喝下你特制的“惩罚特饮”，还是选择“真心话”？]`);
+        if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
+        setGameState('decision');
+      } else {
+        setWinner(null);
+        const text = await generateGameContent(`[系统提示：平局（都是 ${uDice} 点）。请吐槽一下，并要求重新掷骰子。]`);
+        if (typeof text === 'string') setHistory(prev => [...prev, { role: 'bartender', text }]);
+      }
+    } catch (error) {
+      console.error("Roll dice error:", error);
+      setHistory(prev => [...prev, { role: 'system', text: '游戏同步出错，请重试。' }]);
+    } finally {
+      setIsRolling(false);
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const userMixDrink = async () => {
@@ -372,47 +377,55 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
       ];
       const randomEvent = events[Math.floor(Math.random() * events.length)];
       
-      const text = await generateGameContent(`[系统提示：你喝醉了！醉酒状态：${randomEvent}。请根据这个状态进行表演，与用户互动。]`);
-      if (typeof text === 'string') {
-          setHistory(prev => [...prev, { role: 'bartender', text: `(醉酒状态) ${text}` }]);
+      try {
+        const text = await generateGameContent(`[系统提示：你喝醉了！醉酒状态：${randomEvent}。请根据这个状态进行表演，与用户互动。]`);
+        if (typeof text === 'string') {
+            setHistory(prev => [...prev, { role: 'bartender', text: `(醉酒状态) ${text}` }]);
+        }
+      } catch (error) {
+        console.error("Drunk event error:", error);
       }
   };
 
   const handleUserDecision = async (choice: 'drink' | 'truth') => {
       setIsLoading(true);
-      if (choice === 'drink') {
-          setUserIntoxication(prev => prev + 1);
-          setHistory(prev => [...prev, { role: 'user', text: "(选择了喝酒)" }]);
-          
-          let drunkPrompt = "";
-          if (userIntoxication + 1 >= DRUNK_THRESHOLD) {
-              drunkPrompt = " [系统提示：用户已经喝醉了！请根据你的人设，对醉酒的用户做出反应，可以是关切、调侃、照顾或趁机套话。]";
-          }
-          
-          const text = await generateGameContent(`[系统提示：用户选择了“大冒险/喝酒”。请发挥你的创意，现场调制一杯名字古怪、成分离谱的“惩罚特饮”，描述它的外观 and 气味，并看着用户喝下去。]${drunkPrompt}`);
-          if (typeof text === 'string') {
-              setHistory(prev => [...prev, { role: 'bartender', text }]);
-              syncToChat(`我选择喝酒。\n${selectedPersona?.name}: ${text}`, 'user');
-              addToMemory(`用户选择了喝酒惩罚，你调制了特饮并看着TA喝下。`);
-          }
-      } else {
-          setGameState('answering');
-          setHistory(prev => [...prev, { role: 'user', text: "(选择了真心话)" }]);
-          
-          let drunkPrompt = "";
-          if (userIntoxication >= DRUNK_THRESHOLD) {
-              drunkPrompt = " [系统提示：用户已经喝醉了！请根据你的人设，对醉酒的用户做出反应，可以是关切、调侃、照顾或趁机套话。]";
-          }
-          
-          const text = await generateGameContent(`[系统提示：用户选择了“真心话”。请问用户一个犀利、有趣或略带私密的问题。]${drunkPrompt}`);
-          if (typeof text === 'string') {
-              setHistory(prev => [...prev, { role: 'bartender', text }]);
-          }
+      try {
+        if (choice === 'drink') {
+            setUserIntoxication(prev => prev + 1);
+            setHistory(prev => [...prev, { role: 'user', text: "(选择了喝酒)" }]);
+            
+            let drunkPrompt = "";
+            if (userIntoxication + 1 >= DRUNK_THRESHOLD) {
+                drunkPrompt = " [系统提示：用户已经喝醉了！请根据你的人设，对醉酒的用户做出反应，可以是关切、调侃、照顾或趁机套话。]";
+            }
+            
+            const text = await generateGameContent(`[系统提示：用户选择了“大冒险/喝酒”。请发挥你的创意，现场调制一杯名字古怪、成分离谱的“惩罚特饮”，描述它的外观 and 气味，并看着用户喝下去。]${drunkPrompt}`);
+            if (typeof text === 'string') {
+                setHistory(prev => [...prev, { role: 'bartender', text }]);
+                syncToChat(`我选择喝酒。\n${selectedPersona?.name}: ${text}`, 'user');
+                addToMemory(`用户选择了喝酒惩罚，你调制了特饮并看着TA喝下。`);
+            }
+            setGameState('round-end');
+        } else {
+            setGameState('answering');
+            setHistory(prev => [...prev, { role: 'user', text: "(选择了真心话)" }]);
+            
+            let drunkPrompt = "";
+            if (userIntoxication >= DRUNK_THRESHOLD) {
+                drunkPrompt = " [系统提示：用户已经喝醉了！请根据你的人设，对醉酒的用户做出反应，可以是关切、调侃、照顾或趁机套话。]";
+            }
+            
+            const text = await generateGameContent(`[系统提示：用户选择了“真心话”。请问用户一个犀利、有趣或略带私密的问题。]${drunkPrompt}`);
+            if (typeof text === 'string') {
+                setHistory(prev => [...prev, { role: 'bartender', text }]);
+            }
+        }
+      } catch (error) {
+        console.error("Decision error:", error);
+        setHistory(prev => [...prev, { role: 'system', text: '操作失败，请重试。' }]);
+      } finally {
+        setIsLoading(false);
       }
-      if (choice === 'drink') {
-        setGameState('round-end');
-      }
-      setIsLoading(false);
   };
 
   const submitAnswer = async () => {
@@ -446,9 +459,10 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
 
   if (!selectedPersonaId) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-200 z-[100] flex flex-col">
+      <div className="absolute inset-0 bg-slate-900 text-slate-200 z-[100] flex flex-col">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 opacity-100" />
         <div 
-          className={`pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md`}
+          className={`relative z-10 pb-2 flex items-center px-4 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-md`}
           style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
         >
           <button onClick={onBack} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
@@ -485,10 +499,11 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] text-slate-200 z-[100] flex flex-col font-sans">
+    <div className="absolute inset-0 bg-[#0f172a] text-slate-200 z-[100] flex flex-col font-sans overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] opacity-100" />
       {/* Header */}
       <div 
-        className={`pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-10 shadow-sm`}
+        className={`relative pb-2 px-4 flex items-center border-b border-white/5 shrink-0 bg-white/5 backdrop-blur-xl z-20 shadow-sm`}
         style={{ paddingTop: theme.showStatusBar !== false ? 'calc(3.5rem + env(safe-area-inset-top))' : 'calc(3rem + env(safe-area-inset-top))' }}
       >
         <button onClick={() => setSelectedPersonaId(null)} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
@@ -507,7 +522,7 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
+      <div className="relative z-10 flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         <AnimatePresence mode="popLayout">
           {history.map((msg, idx) => (
             <motion.div
@@ -549,7 +564,7 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
 
       {/* Interaction Area */}
       <div 
-        className="p-5 bg-white/5 backdrop-blur-2xl border-t border-white/10 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
+        className="relative z-10 p-5 bg-white/5 backdrop-blur-2xl border-t border-white/10 shrink-0 shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
         style={{ paddingBottom: 'calc(2rem + env(safe-area-inset-bottom))' }}
       >
         
