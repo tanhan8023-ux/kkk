@@ -598,6 +598,7 @@ export function XHSScreen({
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="absolute inset-0 z-[110] bg-white flex flex-col"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="h-12 flex items-center justify-between px-4 border-b border-neutral-100 shrink-0">
               <button onClick={() => setSelectedPostId(null)} className="text-neutral-600">
@@ -726,6 +727,7 @@ export function XHSScreen({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="absolute inset-0 z-[140] bg-white flex flex-col"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             {(() => {
               const item = MARKET_ITEMS.find(i => i.id === selectedMarketItemId);

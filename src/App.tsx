@@ -533,6 +533,45 @@ export default function App() {
       comments: 5,
       commentsList: [],
       createdAt: Date.now() - 54000000
+    },
+    {
+      id: 'xhs9',
+      authorId: 'npc7',
+      authorName: '职场生存指南',
+      authorAvatar: 'https://picsum.photos/seed/work/100/100',
+      title: '拒绝职场内耗！这几点你一定要知道。💼',
+      content: '工作是做不完的，身体是自己的。学会拒绝不合理的要求，保护好自己的能量场。✨ #职场成长 #拒绝内耗 #打工人日常',
+      images: ['https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?auto=format&fit=crop&w=800&q=80'],
+      likes: 1200,
+      comments: 45,
+      commentsList: [],
+      createdAt: Date.now() - 64800000
+    },
+    {
+      id: 'xhs10',
+      authorId: 'npc8',
+      authorName: '极简主义者',
+      authorAvatar: 'https://picsum.photos/seed/minimal/100/100',
+      title: '断舍离之后，我的生活发生了这些变化。🌿',
+      content: '扔掉了多余的杂物，心境也变得开阔了。极简不是苦行，而是为了把空间留给真正重要的东西。🤍 #极简生活 #断舍离 #生活美学',
+      images: ['https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=800&q=80'],
+      likes: 950,
+      comments: 28,
+      commentsList: [],
+      createdAt: Date.now() - 75600000
+    },
+    {
+      id: 'xhs11',
+      authorId: 'npc9',
+      authorName: '萌宠日记',
+      authorAvatar: 'https://picsum.photos/seed/pet/100/100',
+      title: '被这只小猫咪治愈了！谁能拒绝毛茸茸呢？🐱',
+      content: '下班回家看到它在门口等我，所有的烦恼都烟消云散了。它是我的小天使。👼 #猫咪日常 #治愈系宠物 #铲屎官的快乐',
+      images: ['https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=800&q=80'],
+      likes: 2100,
+      comments: 56,
+      commentsList: [],
+      createdAt: Date.now() - 86400000
     }
   ]);
 
@@ -549,8 +588,8 @@ export default function App() {
     if (!isReady || !hasApiKey) return;
 
     const interval = setInterval(async () => {
-      // 10% chance to generate a new post every 2 minutes
-      if (Math.random() > 0.1) return;
+      // 30% chance to generate a new post every 1 minute for more dynamic feel
+      if (Math.random() > 0.3) return;
       
       try {
         const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
@@ -571,7 +610,7 @@ export default function App() {
       } catch (e) {
         console.error("Failed to generate background XHS post:", e);
       }
-    }, 120000); // Check every 2 minutes
+    }, 60000); // Check every 1 minute
 
     return () => clearInterval(interval);
   }, [isReady, hasApiKey, apiSettings, worldbook, userProfile]);
@@ -606,7 +645,7 @@ export default function App() {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const migrate = async (key: string, setter: any) => {
+        const migrate = async (key: string, setter: any, defaultVal?: any) => {
           let val = await localforage.getItem(key);
           if (!val) {
             const lsVal = localStorage.getItem(key);
@@ -617,7 +656,21 @@ export default function App() {
               } catch (e) {}
             }
           }
-          if (val) setter(val);
+          
+          if (val) {
+            if (key === 'xhsPosts' && Array.isArray(val) && Array.isArray(defaultVal)) {
+              // Merge stored posts with new default posts, avoiding duplicates
+              const combined = [...val];
+              defaultVal.forEach(dp => {
+                if (!combined.find(p => p.id === dp.id)) {
+                  combined.push(dp);
+                }
+              });
+              setter(combined);
+            } else {
+              setter(val);
+            }
+          }
         };
 
         await Promise.all([
@@ -627,7 +680,7 @@ export default function App() {
           migrate('worldbook', setWorldbook),
           migrate('messages', setMessages),
           migrate('moments', setMoments),
-          migrate('xhsPosts', setXhsPosts),
+          migrate('xhsPosts', setXhsPosts, xhsPosts),
           migrate('xhsPrivateChats', setXhsPrivateChats),
           migrate('treeHolePrivateChats', setTreeHolePrivateChats),
           migrate('treeHolePersonas', setTreeHolePersonas),
