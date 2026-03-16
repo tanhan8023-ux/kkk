@@ -848,28 +848,60 @@ export async function fetchAiResponse(
       });
     }
 
-    let res;
-    try {
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${effectiveApiSettings.apiKey}`
-        },
-        body: JSON.stringify({
-          model: forceModel || effectiveApiSettings.model,
-          messages: openAiMessages,
-          temperature: effectiveApiSettings.temperature,
-          seed: Math.floor(Math.random() * 1000000),
-        })
-      });
-    } catch (error) {
-      throw new Error(`Network error: Failed to fetch. Please check your API URL or network connection. Details: ${error instanceof Error ? error.message : String(error)}`);
+    // Truncate messages if too many (simple heuristic)
+    const MAX_MESSAGES = 20;
+    if (openAiMessages.length > MAX_MESSAGES) {
+      const systemMessage = openAiMessages[0];
+      const recentMessages = openAiMessages.slice(-MAX_MESSAGES + 1);
+      openAiMessages.splice(0, openAiMessages.length, systemMessage, ...recentMessages);
     }
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(`HTTP error! status: ${res.status}, message: ${JSON.stringify(errorData)}`);
+    let res;
+    let retries = 0;
+    const maxRetries = 3;
+    let currentModel = forceModel || effectiveApiSettings.model;
+
+    while (retries < maxRetries) {
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${effectiveApiSettings.apiKey}`
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages: openAiMessages,
+            temperature: effectiveApiSettings.temperature,
+            seed: Math.floor(Math.random() * 1000000),
+          })
+        });
+
+        if (res.ok) break;
+
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || "";
+        
+        // 如果遇到频率限制或配额耗尽，尝试降级模型或等待
+        if (res.status === 429 || errorMessage.includes("limit") || errorMessage.includes("quota")) {
+          retries++;
+          if (currentModel.includes("pro")) {
+            currentModel = "gemini-3.1-flash-lite-preview"; // 降级到更轻量的模型
+          }
+          await new Promise(resolve => setTimeout(resolve, 5000 * retries)); // 指数退避
+          continue;
+        }
+        
+        throw new Error(`HTTP error! status: ${res.status}, message: ${JSON.stringify(errorData)}`);
+      } catch (error) {
+        if (retries === maxRetries - 1) throw error;
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 5000 * retries));
+      }
+    }
+
+    if (!res || !res.ok) {
+      throw new Error(`API 请求失败，已尝试重试。`);
     }
     const data = await res.json();
     
