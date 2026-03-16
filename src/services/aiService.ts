@@ -1,6 +1,7 @@
 import React from "react";
 import { GoogleGenAI } from "@google/genai";
 import { Persona, ApiSettings, WorldbookSettings, UserProfile } from "../types";
+import { memoryService } from "./memoryService";
 
 export async function generateLyrics(
   title: string,
@@ -81,6 +82,47 @@ export async function generateLyrics(
   }
 
   return responseText;
+}
+
+export async function extractAndSaveMemory(
+  userMessage: string,
+  aiResponse: string,
+  aiRef: React.MutableRefObject<GoogleGenAI | null>,
+  apiSettings: ApiSettings
+): Promise<void> {
+  const apiKey = apiSettings.apiKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) return;
+
+  const ai = aiRef.current || new GoogleGenAI({ apiKey });
+
+  const prompt = `分析以下对话，提取用户的偏好（例如：喜欢的食物、兴趣、习惯）和重要的上下文信息。
+  
+  用户消息：${userMessage}
+  AI 回复：${aiResponse}
+  
+  请以 JSON 格式返回：
+  {
+    "preference": "提取到的偏好，如果没有则为空字符串",
+    "context": "提取到的重要上下文，如果没有则为空字符串"
+  }
+  只返回 JSON，不要有其他内容。`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+    
+    if (response.text) {
+      const { preference, context } = JSON.parse(response.text);
+      if (preference || context) {
+        await memoryService.saveMemory(preference, context);
+      }
+    }
+  } catch (error) {
+    console.error("Error extracting memory:", error);
+  }
 }
 
 export async function generateImage(prompt: string, providedApiKey: string): Promise<string> {
@@ -661,6 +703,11 @@ export async function fetchAiResponse(
   });
   const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
 
+  const memories = await memoryService.getMemories();
+  const memoryInstruction = memories.preferences.length > 0 || memories.pastContext.length > 0
+    ? `【长期记忆】\n你对用户的偏好和过去的对话有以下记忆：\n- 偏好：${memories.preferences.join(', ')}\n- 过去对话摘要：${memories.pastContext.join('; ')}\n请在对话中体现出你对这些信息的了解，进行个性化回应。`
+    : "";
+
   const jailbreakPrompts = [worldbook.jailbreakPrompt, ...(worldbook.jailbreakPrompts || [])].filter(Boolean);
   const globalPrompts = [worldbook.globalPrompt, ...(worldbook.globalPrompts || [])].filter(Boolean);
   const personaPrompts = [persona.prompt, ...(persona.prompts || [])].filter(Boolean);
@@ -672,6 +719,7 @@ export async function fetchAiResponse(
   ].filter(Boolean).join('\n\n') : [
     ...jailbreakPrompts,
     ...globalPrompts,
+    memoryInstruction,
     `【当前时间】现在是 ${timeString} 星期${dayOfWeek}。请在对话中自然地体现出对时间的感知（例如：早上好、该吃午饭了、这么晚还不睡等），但不要生硬地报时。`,
     isOffline ? `【当前状态】你目前处于“离线”状态。请根据你的人设生成一条自动回复，告知用户你稍后回复。⚠️注意：你的回复必须以“[自动回复] ”开头！例如：“[自动回复] 我现在有点忙，稍后找你。”` : `【当前状态】你目前处于“在线”状态。`,
     "【视觉感知核心准则】当你收到图片时，你必须将其视为当前对话的最高优先级。请仔细分析图片中的每一个像素级细节。你的回复必须与图片内容产生强关联，绝对严禁忽视图片内容而自说自话。如果图片内容与之前的对话有任何偏差，请以图片展示的真实情况为准。\n" +

@@ -3,7 +3,26 @@ import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Boo
 import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
-import { fetchAiResponse, generateMoment, checkIfPersonaIsOffline, summarizeChat } from '../services/aiService';
+import { fetchAiResponse as originalFetchAiResponse, generateMoment, checkIfPersonaIsOffline, summarizeChat, extractAndSaveMemory } from '../services/aiService';
+
+// Wrapper function to handle memory learning
+const fetchAiResponse = async (
+  promptText: string,
+  contextMessages: any[],
+  persona: Persona,
+  apiSettings: ApiSettings,
+  worldbook: WorldbookSettings,
+  userProfile: UserProfile,
+  aiRef: React.MutableRefObject<GoogleGenAI | null>,
+  ...args: any[]
+) => {
+  const response = await originalFetchAiResponse(promptText, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, ...args);
+  // Only learn from user messages, not system events
+  if (!promptText.startsWith('[系统')) {
+    await extractAndSaveMemory(promptText, response.responseText, aiRef, apiSettings);
+  }
+  return response;
+};
 
 import { ChatInput } from './ChatInput';
 import { ChatListView } from './ChatListView';
