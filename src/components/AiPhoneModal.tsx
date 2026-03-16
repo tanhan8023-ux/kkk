@@ -95,7 +95,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
       name: persona.aiPhoneSettings?.userRemark || userProfile.name || "我", 
       role: "主人", 
       avatar: userProfile.avatarUrl || "https://picsum.photos/seed/user_avatar/100/100", 
-      status: "[在线] 正在查看我的手机" 
+      status: persona.isOffline ? "[离线] 暂时不方便回复" : "[在线] 正在查看我的手机" 
     };
 
     const baseContacts: any[] = [userContact];
@@ -103,27 +103,27 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
     let personaContacts: any[] = [];
     if (isCat) {
       personaContacts = [
-        { id: 4, name: "小鱼干供应商", role: "后勤", avatar: "https://picsum.photos/seed/fish/100/100", status: "[在线] 刚进了一批顶级三文鱼" },
+        { id: 4, name: "小鱼干供应商", role: "后勤", avatar: "https://picsum.photos/seed/fish/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 刚进了一批顶级三文鱼" },
         { id: 5, name: "隔壁的小黑", role: "玩伴", avatar: "https://picsum.photos/seed/cat2/100/100", status: "[离线] 正在晒太阳" },
-        { id: 6, name: "猫薄荷研究员", role: "专家", avatar: "https://picsum.photos/seed/mint/100/100", status: "[在线] 实验结果非常惊人" },
+        { id: 6, name: "猫薄荷研究员", role: "专家", avatar: "https://picsum.photos/seed/mint/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 实验结果非常惊人" },
       ];
     } else if (isTech) {
       personaContacts = [
-        { id: 4, name: "GitHub 机器人", role: "助手", avatar: "https://picsum.photos/seed/github/100/100", status: "[在线] 有新的 Pull Request" },
+        { id: 4, name: "GitHub 机器人", role: "助手", avatar: "https://picsum.photos/seed/github/100/100", status: persona.isOffline ? "[离线] 维护中" : "[在线] 有新的 Pull Request" },
         { id: 5, name: "StackOverflow 大神", role: "导师", avatar: "https://picsum.photos/seed/so/100/100", status: "[离线] 正在调试代码" },
-        { id: 6, name: "服务器监控", role: "系统", avatar: "https://picsum.photos/seed/server/100/100", status: "[在线] 负载正常" },
+        { id: 6, name: "服务器监控", role: "系统", avatar: "https://picsum.photos/seed/server/100/100", status: persona.isOffline ? "[离线] 维护中" : "[在线] 负载正常" },
       ];
     } else if (isProfessional) {
       personaContacts = [
-        { id: 4, name: "秘书", role: "助理", avatar: "https://picsum.photos/seed/sec/100/100", status: "[在线] 会议安排已更新" },
+        { id: 4, name: "秘书", role: "助理", avatar: "https://picsum.photos/seed/sec/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 会议安排已更新" },
         { id: 5, name: "客户经理", role: "合作伙伴", avatar: "https://picsum.photos/seed/client/100/100", status: "[忙碌] 正在处理合同" },
-        { id: 6, name: "法律顾问", role: "专家", avatar: "https://picsum.photos/seed/law/100/100", status: "[在线] 随时待命" },
+        { id: 6, name: "法律顾问", role: "专家", avatar: "https://picsum.photos/seed/law/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 随时待命" },
       ];
     } else {
       personaContacts = [
         { id: 4, name: "Midjourney", role: "艺术家", avatar: "https://picsum.photos/seed/mj/100/100", status: "[忙碌] 正在生成 4K 杰作" },
-        { id: 5, name: "Sora", role: "导演", avatar: "https://picsum.photos/seed/sora/100/100", status: "[在线] 视频渲染中..." },
-        { id: 6, name: "AutoGPT", role: "执行官", avatar: "https://picsum.photos/seed/autogpt/100/100", status: "[在线] 任务队列已满" },
+        { id: 5, name: "Sora", role: "导演", avatar: "https://picsum.photos/seed/sora/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 视频渲染中..." },
+        { id: 6, name: "AutoGPT", role: "执行官", avatar: "https://picsum.photos/seed/autogpt/100/100", status: persona.isOffline ? "[离线] 休息中" : "[在线] 任务队列已满" },
       ];
     }
 

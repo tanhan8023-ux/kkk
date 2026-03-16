@@ -207,6 +207,17 @@ export function ChatScreen({
     }
   }, [currentChatId, messages]);
 
+  // Check persona status when switching chat
+  useEffect(() => {
+    const persona = personas.find(p => p.id === currentChatId);
+    if (persona) {
+      const contextMessages = messages.slice(-20).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }));
+      checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, contextMessages).then(isOffline => {
+        setPersonas(prev => prev.map(p => p.id === persona.id ? { ...p, isOffline } : p));
+      });
+    }
+  }, [currentChatId, personas, messages]);
+
   const handleUnreadReaction = async (persona: Persona, lastMsgId: string) => {
     // Double check state hasn't changed
     const currentLastMsg = messages[messages.length - 1];
