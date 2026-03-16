@@ -404,6 +404,12 @@ export default function App() {
 
   // Lifted State
   const [messages, setMessages] = useState<Message[]>([]);
+  useEffect(() => {
+    localforage.getItem<Message[]>('messages').then(m => m && setMessages(m));
+  }, []);
+  useEffect(() => {
+    localforage.setItem('messages', messages);
+  }, [messages]);
   const [moments, setMoments] = useState<Moment[]>([{
     id: 'm1',
     authorId: 'p1',

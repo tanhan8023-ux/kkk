@@ -199,7 +199,7 @@ export function ChatScreen({
       // Construct prompt for "Unread Reaction"
       const timeSinceRead = unreadPesterCount === 0 ? "3分钟" : `${3 + unreadPesterCount * 3}分钟`;
       
-      const pesterPrompt = `
+      let pesterPrompt = `
 [系统指令：已读不回反应模式]
 用户已读了你的上一条消息，但已经过了 ${timeSinceRead} 没有回复。
 你已经发送了 ${unreadPesterCount} 条追问消息试图引起注意。
@@ -220,6 +220,10 @@ export function ChatScreen({
 
 如果你决定**完全不发送任何消息**（保持沉默），请仅输出：\`[NO_REPLY]\`
 `;
+
+      if (persona.isSegmentResponse) {
+        pesterPrompt += "\n\n【分段回复要求】请务必将你的回复分成多个短句，每句话之间必须用换行符（\\n）分隔。不要把所有内容写在一段里，要像真人连续发多条微信一样，每条消息简短自然。例如：\n第一句话\n第二句话\n第三句话";
+      }
 
       const aiRef = { current: new GoogleGenAI({ apiKey: apiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string }) };
       

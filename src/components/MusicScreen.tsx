@@ -344,11 +344,11 @@ export function MusicScreen({
   const [parsedLyrics, setParsedLyrics] = useState<{time: number, text: string}[]>([]);
   const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
   const [lyricOffset, setLyricOffset] = useState(0);
-  const [isEditingLyrics, setIsEditingLyrics] = useState(false);
-  const [editedLyrics, setEditedLyrics] = useState('');
   const [isEditingMetadata, setIsEditingMetadata] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [editedArtist, setEditedArtist] = useState('');
+  const [editedLyrics, setEditedLyrics] = useState('');
+  const [isEditingLyrics, setIsEditingLyrics] = useState(false);
 
   // Parse lyrics when song changes
   useEffect(() => {
@@ -945,10 +945,16 @@ export function MusicScreen({
                         className="text-sm text-neutral-500 font-medium mt-0.5 bg-neutral-100 rounded px-2 py-1 outline-none"
                         placeholder="歌手名"
                       />
+                      <textarea 
+                        value={editedLyrics} 
+                        onChange={e => setEditedLyrics(e.target.value)} 
+                        className="text-xs text-neutral-600 font-mono mt-2 bg-neutral-100 rounded px-2 py-1 outline-none h-32 resize-none"
+                        placeholder="在此处手动粘贴或编辑 LRC 歌词"
+                      />
                       <div className="flex gap-2 mt-1">
                         <button onClick={() => {
                           if (onUpdateSong) {
-                            onUpdateSong(currentSong.id, { title: editedTitle, artist: editedArtist });
+                            onUpdateSong(currentSong.id, { title: editedTitle, artist: editedArtist, lyrics: editedLyrics });
                           }
                           setIsEditingMetadata(false);
                         }} className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-full font-medium">保存</button>
@@ -964,6 +970,7 @@ export function MusicScreen({
                           onClick={() => {
                             setEditedTitle(currentSong.title);
                             setEditedArtist(currentSong.artist);
+                            setEditedLyrics(currentSong.lyrics);
                             setIsEditingMetadata(true);
                           }}
                           className="absolute top-1 right-0 p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-neutral-100 rounded-full"
