@@ -101,6 +101,7 @@ export interface ApiSettings {
   momentsModel?: string;
   autoPostMoments?: boolean;
   autoUpdateStatus?: boolean;
+  isAutoXhsEnabled?: boolean;
 }
 
 export interface Widget {

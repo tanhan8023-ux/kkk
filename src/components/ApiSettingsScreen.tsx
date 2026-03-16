@@ -20,6 +20,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   const [momentsModel, setMomentsModel] = useState(settings.momentsModel || '');
   const [autoPostMoments, setAutoPostMoments] = useState(settings.autoPostMoments ?? true);
   const [autoUpdateStatus, setAutoUpdateStatus] = useState(settings.autoUpdateStatus ?? true);
+  const [isAutoXhsEnabled, setIsAutoXhsEnabled] = useState(settings.isAutoXhsEnabled ?? true);
   const [voiceModel, setVoiceModel] = useState(settings.voiceModel || '');
   const [voiceApiUrl, setVoiceApiUrl] = useState(settings.voiceApiUrl || '');
   const [voiceApiKey, setVoiceApiKey] = useState(settings.voiceApiKey || '');
@@ -47,6 +48,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
                      momentsModel !== (settings.momentsModel || '') ||
                      autoPostMoments !== (settings.autoPostMoments ?? true) ||
                      autoUpdateStatus !== (settings.autoUpdateStatus ?? true) ||
+                     isAutoXhsEnabled !== (settings.isAutoXhsEnabled ?? true) ||
                      voiceModel !== (settings.voiceModel || '') ||
                      voiceApiUrl !== (settings.voiceApiUrl || '') ||
                      voiceApiKey !== (settings.voiceApiKey || '') ||
@@ -85,7 +87,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   const handleSave = () => {
     onSave({ 
       apiUrl, apiKey, model, 
-      momentsApiUrl, momentsApiKey, momentsModel, autoPostMoments, autoUpdateStatus,
+      momentsApiUrl, momentsApiKey, momentsModel, autoPostMoments, autoUpdateStatus, isAutoXhsEnabled,
       voiceModel, voiceApiUrl, voiceApiKey, voiceParams, 
       asrModel, asrApiUrl, asrApiKey, asrParams, 
       temperature, proactiveDelay 
@@ -436,10 +438,10 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
           </div>
 
           <div className="space-y-2 pt-2">
-            <label className="text-[11px] font-medium text-neutral-500 ml-1">主动回复延迟 ({proactiveDelay}秒)</label>
+            <label className="text-[11px] font-medium text-neutral-500 ml-1">主动回复延迟 ({proactiveDelay}分钟)</label>
             <input 
               type="range" 
-              min="5" max="60" step="1"
+              min="1" max="120" step="1"
               value={proactiveDelay}
               onChange={(e) => setProactiveDelay(parseInt(e.target.value))}
               className="w-full accent-blue-500 h-1.5 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
@@ -551,6 +553,16 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
               className={`w-10 h-6 rounded-full transition-colors ${autoUpdateStatus ? 'bg-emerald-500' : 'bg-neutral-300'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full transition-transform ${autoUpdateStatus ? 'translate-x-5' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider ml-1">小红书 AI 自动发帖</label>
+            <button
+              onClick={() => setIsAutoXhsEnabled(!isAutoXhsEnabled)}
+              className={`w-10 h-6 rounded-full transition-colors ${isAutoXhsEnabled ? 'bg-emerald-500' : 'bg-neutral-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isAutoXhsEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
             </button>
           </div>
 

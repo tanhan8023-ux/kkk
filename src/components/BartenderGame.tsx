@@ -232,7 +232,11 @@ export function BartenderGame({ onBack, apiSettings, personas, messages, setMess
         undefined,
         {
             // Override model if needed, but we use apiSettings.model by default
-        }
+        },
+        undefined,
+        undefined,
+        undefined,
+        expectJson // isSystemTask
       );
       
       let text = response.responseText;

@@ -28,7 +28,23 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
 当前情景：${persona.context || '未设置'}
 要求：语气符合人设，简短有力，不要超过30个字。直接输出回复内容，不要有任何解释。`;
       
-      const response = await fetchAiResponse(prompt, [], persona, apiSettings, worldbook, userProfile, aiRef);
+      const response = await fetchAiResponse(
+        prompt,
+        [],
+        persona,
+        apiSettings,
+        worldbook,
+        userProfile,
+        aiRef,
+        false,
+        "",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true
+      );
       handleUpdatePersona(persona.id, 'statusMessage', response.responseText);
     } catch (e) {
       console.error("Failed to generate AI status:", e);

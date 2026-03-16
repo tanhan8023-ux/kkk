@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronDown, Play, Pause, SkipBack, SkipForward, 
   ListMusic, Plus, Share, MoreHorizontal, Music, Trash2, FolderPlus, Folder, Users, X, Heart,
-  Minimize2, Maximize2, Image as ImageIcon, Upload
+  Minimize2, Maximize2, Image as ImageIcon, Upload, Edit2
 } from 'lucide-react';
 import { Song, Persona, Playlist, Message, ApiSettings, WorldbookSettings, UserProfile, ThemeSettings } from '../types';
-import { fetchAiResponse } from '../services/aiService';
+import { fetchAiResponse, generateLyrics } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
+import * as mm from 'music-metadata-browser';
 
 interface MusicScreenProps {
   onBack: () => void;
@@ -34,6 +35,7 @@ interface MusicScreenProps {
   personas: Persona[];
   userProfile?: UserProfile;
   onShareToChat?: (song: Song, personaId: string) => void;
+  onShareLyricsToChat?: (songTitle: string, lyrics: string, personaId: string) => void;
   onShareToMoments?: (song: Song) => void;
   messages?: Message[];
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -70,6 +72,7 @@ export function MusicScreen({
   personas,
   userProfile,
   onShareToChat,
+  onShareLyricsToChat,
   onShareToMoments,
   messages = [],
   setMessages,
@@ -140,7 +143,13 @@ export function MusicScreen({
             userProfile,
             aiRef,
             false,
-            "请务必只输出合法的JSON格式，不要包含Markdown代码块标记。"
+            "请务必只输出合法的JSON格式，不要包含Markdown代码块标记。",
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            true
           );
 
           let result;
@@ -334,21 +343,30 @@ export function MusicScreen({
 
   const [parsedLyrics, setParsedLyrics] = useState<{time: number, text: string}[]>([]);
   const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
+  const [lyricOffset, setLyricOffset] = useState(0);
+  const [isEditingLyrics, setIsEditingLyrics] = useState(false);
+  const [editedLyrics, setEditedLyrics] = useState('');
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [editedArtist, setEditedArtist] = useState('');
 
   // Parse lyrics when song changes
   useEffect(() => {
+    setLyricOffset(0); // Reset offset when song changes
+    setEditedLyrics(currentSong?.lyrics || '');
     if (currentSong?.lyrics) {
       const parsed = currentSong.lyrics.split('\n').map(line => {
-        const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+        const match = line.match(/\[(\d+):(\d+(\.\d+)?)\](.*)/);
         if (match) {
+          const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
           return {
-            time: parseInt(match[1]) * 60 + parseFloat(match[2]),
-            text: match[3].trim()
+            time: time,
+            text: match[4].trim()
           };
         }
         return null;
       }).filter((item): item is {time: number, text: string} => item !== null && item.text !== '');
-      setParsedLyrics(parsed);
+      setParsedLyrics(parsed.sort((a, b) => a.time - b.time));
     } else {
       setParsedLyrics([]);
     }
@@ -360,20 +378,33 @@ export function MusicScreen({
     
     const index = parsedLyrics.findIndex((lyric, i) => {
       const nextLyric = parsedLyrics[i + 1];
-      return currentTime >= lyric.time && (!nextLyric || currentTime < nextLyric.time);
+      return (currentTime + lyricOffset) >= lyric.time && (!nextLyric || (currentTime + lyricOffset) < nextLyric.time);
     });
 
-    if (index !== -1 && index !== activeLyricIndex) {
-      setActiveLyricIndex(index);
-    }
-  }, [currentTime, parsedLyrics]);
+    setActiveLyricIndex(prev => {
+      if (prev !== index) return index;
+      return prev;
+    });
+  }, [currentTime, lyricOffset, parsedLyrics]);
 
   // Auto-scroll lyrics
   useEffect(() => {
     if (showLyrics && lyricsContainerRef.current && activeLyricIndex !== -1) {
-      const activeElement = lyricsContainerRef.current.children[activeLyricIndex] as HTMLElement;
+      const container = lyricsContainerRef.current;
+      const activeElement = container.querySelector('.active-lyric') as HTMLElement;
+      
       if (activeElement) {
-        activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Calculate the scroll position to center the active element
+        const containerHeight = container.clientHeight;
+        const elementTop = activeElement.offsetTop;
+        const elementHeight = activeElement.clientHeight;
+        
+        const scrollPos = elementTop - (containerHeight / 2) + (elementHeight / 2);
+        
+        container.scrollTo({
+          top: scrollPos,
+          behavior: 'smooth'
+        });
       }
     }
   }, [activeLyricIndex, showLyrics]);
@@ -385,44 +416,65 @@ export function MusicScreen({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
+    const fileList = Array.from(files);
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
       const url = URL.createObjectURL(file);
       
       let title = file.name.replace(/\.[^/.]+$/, "");
       let artist = "未知艺术家";
       
-      if (title.includes(' - ')) {
-        const parts = title.split(' - ');
-        artist = parts[0].trim();
-        title = parts.slice(1).join(' - ').trim();
+      try {
+        // Try to extract metadata from the file
+        const metadata = await mm.parseBlob(file);
+        if (metadata.common.title) {
+          title = metadata.common.title;
+        }
+        if (metadata.common.artist) {
+          artist = metadata.common.artist;
+        } else if (metadata.common.artists && metadata.common.artists.length > 0) {
+          artist = metadata.common.artists[0];
+        }
+        
+        // If we still have generic metadata, try filename parsing
+        if (artist === "未知艺术家" && title === file.name.replace(/\.[^/.]+$/, "")) {
+          if (title.includes(' - ')) {
+            const parts = title.split(' - ');
+            artist = parts[0].trim();
+            title = parts.slice(1).join(' - ').trim();
+          }
+        }
+      } catch (error) {
+        console.error("Metadata extraction failed, falling back to filename:", error);
+        if (title.includes(' - ')) {
+          const parts = title.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
       }
 
-      // Allow user to pick a cover image for the song
-      const coverInput = document.createElement('input');
-      coverInput.type = 'file';
-      coverInput.accept = 'image/*';
-      coverInput.onchange = (e: any) => {
-        const coverFile = e.target.files?.[0];
-        if (coverFile) {
-          const coverUrl = URL.createObjectURL(coverFile);
-          const newSong: Song = {
-            id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title,
-            artist,
-            cover: coverUrl,
-            lyrics: '[00:00.00] 正在提取歌词中...\n[00:05.00] 点击封面可返回封面视图',
-            url,
-            source: 'local'
-          };
-          onAddSong(newSong, file);
-        }
+      const newSong: Song = {
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        title,
+        artist,
+        cover: 'https://picsum.photos/seed/music/400/400', // Default cover
+        lyrics: '[00:00.00] 正在提取歌词中...\n[00:05.00] 点击封面可返回封面视图',
+        url,
+        source: 'local'
       };
-      coverInput.click();
-    });
+      
+      // Use await to process sequentially and avoid hitting rate limits
+      await onAddSong(newSong, file);
+      
+      // Add a small delay between uploads if there are multiple files
+      if (i < fileList.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -610,19 +662,9 @@ export function MusicScreen({
         <input 
           type="file" 
           ref={fileInputRef} 
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const newSong: Song = {
-              id: Date.now().toString(),
-              title: file.name.split('.')[0],
-              artist: '未知艺术家',
-              url: '', 
-              cover: 'https://picsum.photos/seed/default/100/100'
-            };
-            onAddSong(newSong, file);
-          }}
+          onChange={handleFileChange}
           accept="audio/*" 
+          multiple
           className="hidden" 
         />
       </div>
@@ -769,7 +811,97 @@ export function MusicScreen({
                         exit={{ opacity: 0 }}
                       >
                         <div ref={lyricsContainerRef} className="w-full h-full overflow-y-auto scrollbar-hide py-32 relative">
-                          {parsedLyrics.length > 0 ? (
+                          <div className="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2 z-10">
+                            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-2 py-1 border border-white/10">
+                              <button 
+                                onClick={() => setLyricOffset(prev => prev - 0.5)} 
+                                className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full text-xs"
+                                title="提前0.5秒"
+                              >
+                                -0.5s
+                              </button>
+                              <span className="text-[10px] font-mono w-10 text-center text-blue-400">{lyricOffset > 0 ? '+' : ''}{lyricOffset.toFixed(1)}s</span>
+                              <button 
+                                onClick={() => setLyricOffset(prev => prev + 0.5)} 
+                                className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full text-xs"
+                                title="延后0.5秒"
+                              >
+                                +0.5s
+                              </button>
+                              {lyricOffset !== 0 && (
+                                <button 
+                                  onClick={() => setLyricOffset(0)}
+                                  className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full text-[10px] text-white/40"
+                                  title="重置偏移"
+                                >
+                                  重置
+                                </button>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-1 py-1 border border-white/10">
+                              <button onClick={() => {
+                                if (isEditingLyrics) {
+                                  onUpdateSong(currentSong.id, { lyrics: editedLyrics });
+                                }
+                                setIsEditingLyrics(!isEditingLyrics);
+                              }} className="px-3 py-1 hover:bg-white/10 rounded-full text-xs font-medium">
+                                {isEditingLyrics ? '保存' : '编辑'}
+                              </button>
+                              
+                              {!isEditingLyrics && (
+                                <button 
+                                  onClick={async () => {
+                                    if (!apiSettings || !worldbook || !userProfile || !aiRef) return;
+                                    setIsEditingLyrics(true);
+                                    const lyrics = await generateLyrics(currentSong.title, currentSong.artist, apiSettings, worldbook, userProfile, aiRef, "gemini-3-flash-preview");
+                                    setEditedLyrics(lyrics);
+                                    onUpdateSong?.(currentSong.id, { lyrics });
+                                    setIsEditingLyrics(false);
+                                  }} 
+                                  className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 rounded-full text-blue-400 text-xs font-medium flex items-center gap-1"
+                                  title="重新从云端提取精准歌词"
+                                >
+                                  <Edit2 size={12} />
+                                  <span>重新提取</span>
+                                </button>
+                              )}
+                              
+                              {!isEditingLyrics && listeningWith && onShareLyricsToChat && currentSong?.lyrics && (
+                                <button 
+                                  onClick={() => onShareLyricsToChat(currentSong.title, currentSong.lyrics || '', listeningWith.id)} 
+                                  className="px-3 py-1 hover:bg-white/10 rounded-full text-indigo-300 text-xs font-medium"
+                                >
+                                  分享
+                                </button>
+                              )}
+                            </div>
+
+                            {isEditingLyrics && (
+                              <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-full px-1 py-1 border border-white/10">
+                                <button onClick={async () => {
+                                  if (!apiSettings || !worldbook || !userProfile || !aiRef) return;
+                                  const lyrics = await generateLyrics(currentSong.title, currentSong.artist, apiSettings, worldbook, userProfile, aiRef);
+                                  setEditedLyrics(lyrics);
+                                }} className="px-3 py-1 hover:bg-white/10 rounded-full text-xs">
+                                  获取
+                                </button>
+                                <button onClick={() => {
+                                  setEditedLyrics(currentSong?.lyrics || '');
+                                  setIsEditingLyrics(false);
+                                }} className="px-3 py-1 hover:bg-white/10 rounded-full text-xs text-white/40">
+                                  取消
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {isEditingLyrics ? (
+                            <textarea
+                              value={editedLyrics}
+                              onChange={(e) => setEditedLyrics(e.target.value)}
+                              className="w-full h-full bg-black/60 text-white p-4 rounded-xl text-sm font-mono"
+                            />
+                          ) : parsedLyrics.length > 0 ? (
                             parsedLyrics.map((line, i) => {
                               const isActive = i === activeLyricIndex;
                               return (
@@ -797,8 +929,50 @@ export function MusicScreen({
               {/* Song Info */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex-1 min-w-0 pr-4">
-                  <h2 className="text-lg font-bold text-neutral-900 truncate leading-tight">{currentSong.title}</h2>
-                  <p className="text-sm text-neutral-500 font-medium truncate mt-0.5">{currentSong.artist}</p>
+                  {isEditingMetadata ? (
+                    <div className="flex flex-col gap-2">
+                      <input 
+                        type="text" 
+                        value={editedTitle} 
+                        onChange={e => setEditedTitle(e.target.value)} 
+                        className="text-lg font-bold text-neutral-900 leading-tight bg-neutral-100 rounded px-2 py-1 outline-none"
+                        placeholder="歌曲名"
+                      />
+                      <input 
+                        type="text" 
+                        value={editedArtist} 
+                        onChange={e => setEditedArtist(e.target.value)} 
+                        className="text-sm text-neutral-500 font-medium mt-0.5 bg-neutral-100 rounded px-2 py-1 outline-none"
+                        placeholder="歌手名"
+                      />
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => {
+                          if (onUpdateSong) {
+                            onUpdateSong(currentSong.id, { title: editedTitle, artist: editedArtist });
+                          }
+                          setIsEditingMetadata(false);
+                        }} className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-full font-medium">保存</button>
+                        <button onClick={() => setIsEditingMetadata(false)} className="text-xs bg-neutral-200 text-neutral-700 px-3 py-1.5 rounded-full font-medium">取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="group relative pr-6">
+                      <h2 className="text-lg font-bold text-neutral-900 truncate leading-tight">{currentSong.title}</h2>
+                      <p className="text-sm text-neutral-500 font-medium truncate mt-0.5">{currentSong.artist}</p>
+                      {currentSong.source === 'local' && (
+                        <button 
+                          onClick={() => {
+                            setEditedTitle(currentSong.title);
+                            setEditedArtist(currentSong.artist);
+                            setIsEditingMetadata(true);
+                          }}
+                          className="absolute top-1 right-0 p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-neutral-100 rounded-full"
+                        >
+                          <Edit2 className="w-3 h-3 text-neutral-500" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setShowPlaylistSelectorForSong(currentSong.id)} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors bg-neutral-100 rounded-full">
@@ -995,7 +1169,7 @@ export function MusicScreen({
                                   <motion.div animate={{ height: [6, 14, 6] }} transition={{ repeat: Infinity, duration: 0.8, delay: 0.4 }} className="w-1 bg-white rounded-full" />
                                 </div>
                               ) : (
-                                song.source === 'local' && onDeleteSong && (
+                                onDeleteSong && (
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();

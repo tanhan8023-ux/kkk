@@ -353,7 +353,10 @@ export function ChatScreen({
         "",
         apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
         undefined,
-        false // user is always online
+        false, // user is always online
+        undefined,
+        undefined,
+        true
       );
       
       if (response && response.responseText) {
@@ -620,7 +623,7 @@ export function ChatScreen({
   useEffect(() => {
     if (!currentChatId || pendingRequests.current > 0) return;
     
-    const delayMs = (apiSettings.proactiveDelay || 10) * 1000;
+    const delayMs = (apiSettings.proactiveDelay || 10) * 60 * 1000;
 
     const timer = setTimeout(async () => {
        // 50% chance to proactively message if idle for the specified delay
@@ -1548,7 +1551,10 @@ export function ChatScreen({
         "【最高优先级绝对指令】当前任务仅仅是生成一句内心的独白（心声），绝对不要生成任何用于回复用户的对话内容！绝对不要继续聊天！只输出心声！", 
         apiSettings.apiUrl ? undefined : "gemini-3-flash-preview",
         undefined,
-        currentPersona.isOffline
+        currentPersona.isOffline,
+        undefined,
+        undefined,
+        true
       );
       const processed = processAiResponseParts(aiResponse.responseText);
       let innerVoiceText = processed.parts.map(p => p.text).join(' ');

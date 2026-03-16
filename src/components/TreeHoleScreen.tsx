@@ -98,7 +98,15 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
         apiSettings,
         worldbook,
         userProfile,
-        aiRef
+        aiRef,
+        false,
+        "",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true
       );
       
       content = aiResponse.responseText;
@@ -242,7 +250,15 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
               apiSettings,
               worldbook,
               userProfile,
-              aiRef
+              aiRef,
+              false,
+              "",
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              true
             );
             
             const cleanedReply = aiResponse.responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').trim();
@@ -338,7 +354,15 @@ export function TreeHoleScreen({ userProfile, personas, posts, setPosts, notific
               apiSettings,
               worldbook,
               userProfile,
-              aiRef
+              aiRef,
+              false,
+              "",
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              true
             );
             
             const cleanedReply = aiResponse.responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').trim();

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Book, Music, Hash, HeartPulse, Sprout, Truck, MoreHorizontal, Settings, Lock, Palette, Mic, Image as ImageIcon, PlusCircle, Smile, CloudSun, Heart, Sun, ShoppingBag, Cloud, CloudRain, CloudLightning, CloudSnow, CloudDrizzle, CloudFog, RefreshCw, Utensils, Smartphone, Minus, Plus, LayoutGrid, X, Upload, Type, RefreshCcw, Download, Calendar as CalendarIcon, FileText, Camera as CameraIcon, Wallet, Phone } from 'lucide-react';
 import { Responsive, WidthProvider } from 'react-grid-layout/legacy';
 import { motion, AnimatePresence } from 'motion/react';
-import { ThemeSettings, UserProfile, Song } from '../types';
+import { ThemeSettings, UserProfile, Song, Screen } from '../types';
 
 const ResponsiveGridLayoutComponent = WidthProvider(Responsive);
 
@@ -13,7 +13,7 @@ import { LoveWidget } from './LoveWidget';
 import { AcrylicStandWidget } from './AcrylicStandWidget';
 
 interface Props {
-  onNavigate: (screen: 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera') => void;
+  onNavigate: (screen: Screen) => void;
   onLock: () => void;
   theme: ThemeSettings;
   setTheme: React.Dispatch<React.SetStateAction<ThemeSettings>>;

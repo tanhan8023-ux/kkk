@@ -13,8 +13,11 @@ export const storageService = {
   async saveSong(song: Song, file: File | Blob): Promise<void> {
     const blobKey = `${SONG_BLOB_PREFIX}${song.id}`;
     
+    // Convert to pure Blob to avoid browser compatibility issues with File objects in IndexedDB
+    const pureBlob = new Blob([file], { type: file.type });
+    
     // Save the blob
-    await localforage.setItem(blobKey, file);
+    await localforage.setItem(blobKey, pureBlob);
     
     // Save metadata
     const metadata: StoredSongMetadata = {

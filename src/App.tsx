@@ -58,7 +58,7 @@ const ChatBubbleWrapper = React.memo(({
 import { LoveWidgetScreen } from './components/LoveWidgetScreen';
 import { PhotoAlbumScreen } from './components/PhotoAlbumScreen';
 import { WalletScreen } from './components/WalletScreen';
-import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry, Transaction } from './types';
+import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry, Transaction, CallRecord } from './types';
 import { AnimatePresence, motion } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { storageService } from './services/storageService';
@@ -168,15 +168,29 @@ export default function App() {
 
   const currentSong = songs[currentSongIndex];
 
+  // Force load when song changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.load();
+    }
+  }, [currentSong?.id]);
+
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Play error:", e));
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => {
+            if (e.name !== 'AbortError') {
+              console.error("Play error:", e);
+            }
+          });
+        }
       } else {
         audioRef.current.pause();
       }
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong?.id]); // 依赖中加入 currentSong?.id，确保播放状态同步
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
@@ -217,20 +231,23 @@ export default function App() {
   };
 
   const handleAddSong = async (newSong: Song, file: File) => {
+    console.log("Adding song:", newSong);
     // Optimistic update
     setSongs(prev => {
       const newSongs = [...prev, newSong];
       setCurrentSongIndex(newSongs.length - 1);
       return newSongs;
     });
-    setIsPlaying(true);
+    // Ensure we play after state update
+    setTimeout(() => setIsPlaying(true), 50);
 
     // Save initial metadata
     await storageService.saveSong(newSong, file);
 
     // Extract lyrics in background
     try {
-      const lyrics = await lyricService.extractLyrics(newSong.title, newSong.artist, apiSettings);
+      // 确保使用最新的 apiSettings
+      const lyrics = await lyricService.extractLyrics(newSong.title, newSong.artist, apiSettings, worldbook, userProfile, aiRef);
       const updatedSong = { ...newSong, lyrics };
       
       setSongs(prev => prev.map(s => s.id === newSong.id ? updatedSong : s));
@@ -240,8 +257,44 @@ export default function App() {
     }
   };
 
-  const handleUpdateSong = (songId: string, updates: Partial<Song>) => {
-    setSongs(prev => prev.map(s => s.id === songId ? { ...s, ...updates } : s));
+  const handleUpdateSong = async (songId: string, updates: Partial<Song>) => {
+    setSongs(prev => {
+      const updatedSongs = prev.map(s => s.id === songId ? { ...s, ...updates } : s);
+      const updatedSong = updatedSongs.find(s => s.id === songId);
+      if (updatedSong && updatedSong.source === 'local') {
+        // We need the original blob to save it again, but storageService.saveSong expects a File/Blob.
+        // Since we are only updating metadata here, we can just update the metadata array in storage.
+        storageService.getAllMetadata().then(metadata => {
+          const index = metadata.findIndex(m => m.id === songId);
+          if (index >= 0) {
+            metadata[index] = { ...metadata[index], ...updates };
+            localforage.setItem('local_songs_metadata', metadata);
+          }
+        });
+
+        // If title or artist changed, re-fetch lyrics
+        if (updates.title !== undefined || updates.artist !== undefined) {
+           lyricService.extractLyrics(updatedSong.title, updatedSong.artist, apiSettings, worldbook, userProfile, aiRef)
+             .then(lyrics => {
+               setSongs(currentSongs => {
+                 const newSongs = currentSongs.map(s => s.id === songId ? { ...s, lyrics } : s);
+                 
+                 // Update storage again with new lyrics
+                 storageService.getAllMetadata().then(metadata => {
+                    const idx = metadata.findIndex(m => m.id === songId);
+                    if (idx >= 0) {
+                      metadata[idx] = { ...metadata[idx], lyrics };
+                      localforage.setItem('local_songs_metadata', metadata);
+                    }
+                 });
+                 return newSongs;
+               });
+             })
+             .catch(e => console.error("Failed to re-fetch lyrics:", e));
+        }
+      }
+      return updatedSongs;
+    });
   };
 
   const handleCreatePlaylist = (name: string) => {
@@ -625,7 +678,7 @@ export default function App() {
 
   // Background XHS Post Generation
   useEffect(() => {
-    if (!isReady || !hasApiKey) return;
+    if (!isReady || !hasApiKey || apiSettings.isAutoXhsEnabled === false) return;
 
     const interval = setInterval(async () => {
       // 30% chance to generate a new post every 1 minute for more dynamic feel
@@ -1241,6 +1294,12 @@ export default function App() {
       };
       setMessages(prev => [...prev, aiMsg]);
     }, 2000);
+  };
+
+  const handleShareLyricsToChat = (songTitle: string, lyrics: string, personaId: string) => {
+    const text = `分享了歌曲《${songTitle}》的歌词：\n\n${lyrics}`;
+    handleSendMessage(text, personaId);
+    setCurrentScreen('chat');
   };
   const handleShareMusicToMoments = (song: Song) => {
     const newMoment: Moment = {
@@ -1965,6 +2024,25 @@ export default function App() {
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
+          onError={(e) => {
+            console.error("Audio playback error:", e);
+            // If it's a local file and fails, maybe the format is unsupported or blob is corrupted
+            if (currentSong.source === 'local') {
+              console.warn(`Failed to play local song: ${currentSong.title}. The file format might be unsupported or the file is corrupted.`);
+              setNotification({
+                title: '播放失败',
+                body: `无法播放《${currentSong.title}》，可能是格式不支持或文件已损坏。`
+              });
+              if (notificationTimeoutRef.current) {
+                clearTimeout(notificationTimeoutRef.current);
+              }
+              notificationTimeoutRef.current = setTimeout(() => setNotification(null), 4000);
+            }
+            // Auto skip to next song on error
+            setTimeout(() => {
+              handleNextSong();
+            }, 2000);
+          }}
         />
       )}
 
@@ -2150,6 +2228,7 @@ export default function App() {
                     userProfile={userProfile}
                     personas={personas}
                     onShareToChat={handleShareMusicToChat}
+                    onShareLyricsToChat={handleShareLyricsToChat}
                     onShareToMoments={handleShareMusicToMoments}
                     listeningWithPersonaId={listeningWithPersonaId}
                     onStartListeningWith={handleStartListeningWith}
