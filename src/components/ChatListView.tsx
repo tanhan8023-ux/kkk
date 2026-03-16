@@ -53,7 +53,11 @@ export const ChatListView = ({ personas, messages, userProfile, setCurrentChatId
                 {lastMsg ? formatRelativeTime(lastMsg.createdAt) : ''}
               </span>
             </div>
-            {p.statusMessage && <p className="text-[12px] text-blue-500 truncate">[{p.statusMessage}]</p>}
+            {p.isOffline ? (
+              <p className="text-[12px] text-neutral-400 truncate">[离线]</p>
+            ) : (
+              p.statusMessage && <p className="text-[12px] text-blue-500 truncate">[{p.statusMessage}]</p>
+            )}
           </div>
           <p className="text-[13px] text-neutral-500 truncate mt-0.5">
             {lastMsg ? (
