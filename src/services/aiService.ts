@@ -807,7 +807,7 @@ export async function fetchAiResponse(
         systemInstruction: fullSystemInstruction + visionSystemInstruction,
         temperature: effectiveApiSettings.temperature,
         seed: Math.floor(Math.random() * 1000000),
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
       }
     });
     responseText = response.text || "...";

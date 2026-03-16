@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, BookOpen, Download, Upload, Users, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { ChevronLeft, BookOpen, Download, Upload, Users, Image as ImageIcon, RefreshCw, Trash2 } from 'lucide-react';
 import { WorldbookSettings, Persona, ApiSettings, UserProfile, ThemeSettings } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { fetchAiResponse } from '../services/aiService';
@@ -201,6 +201,21 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
               >
                 <Download size={14} /> 导出
               </button>
+              <button 
+                onClick={() => {
+                  if (confirm('确定要删除所有世界书设定吗？此操作不可撤销。')) {
+                    setWorldbook({
+                      jailbreakPrompt: '',
+                      globalPrompt: '',
+                      jailbreakPrompts: [],
+                      globalPrompts: []
+                    });
+                  }
+                }}
+                className="flex items-center gap-1 text-red-500 text-[12px] font-medium active:opacity-70"
+              >
+                <Trash2 size={14} /> 删除
+              </button>
             </div>
           </div>
 
@@ -208,10 +223,10 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
             <div className="flex items-center justify-between">
               <label className="text-[12px] font-medium text-neutral-600 uppercase tracking-wide">破限词 (Jailbreak Prompt)</label>
               <button 
-                onClick={() => handleAddPrompt('jailbreak')}
-                className="text-[12px] text-blue-500 font-medium active:opacity-70"
+                onClick={() => setWorldbook({ ...worldbook, jailbreakPrompt: '' })}
+                className="text-[12px] text-red-500 font-medium active:opacity-70"
               >
-                + 添加输入框
+                清空
               </button>
             </div>
             <p className="text-[10px] text-neutral-400 leading-relaxed">
@@ -223,6 +238,15 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
               placeholder="主破限词..."
               className="w-full h-40 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-[13px] text-neutral-900 leading-relaxed"
             />
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-neutral-600 uppercase tracking-wide">额外破限词</label>
+              <button 
+                onClick={() => handleAddPrompt('jailbreak')}
+                className="text-[12px] text-blue-500 font-medium active:opacity-70"
+              >
+                + 添加输入框
+              </button>
+            </div>
             {worldbook.jailbreakPrompts?.map((p, i) => (
               <div key={i} className="relative group">
                 <textarea 
@@ -233,9 +257,9 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
                 />
                 <button 
                   onClick={() => handleRemovePrompt('jailbreak', i)}
-                  className="absolute top-2 right-2 p-1 bg-red-50 text-red-500 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 p-1 bg-red-50 text-red-500 rounded-md transition-opacity"
                 >
-                  删除
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
@@ -245,10 +269,10 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
             <div className="flex items-center justify-between">
               <label className="text-[12px] font-medium text-neutral-600 uppercase tracking-wide">全局提示词 (Global Prompt)</label>
               <button 
-                onClick={() => handleAddPrompt('global')}
-                className="text-[12px] text-blue-500 font-medium active:opacity-70"
+                onClick={() => setWorldbook({ ...worldbook, globalPrompt: '' })}
+                className="text-[12px] text-red-500 font-medium active:opacity-70"
               >
-                + 添加输入框
+                清空
               </button>
             </div>
             <p className="text-[10px] text-neutral-400 leading-relaxed">
@@ -260,6 +284,15 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
               placeholder="主全局提示词..."
               className="w-full h-40 bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-[13px] text-neutral-900 leading-relaxed"
             />
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-neutral-600 uppercase tracking-wide">额外全局提示词</label>
+              <button 
+                onClick={() => handleAddPrompt('global')}
+                className="text-[12px] text-blue-500 font-medium active:opacity-70"
+              >
+                + 添加输入框
+              </button>
+            </div>
             {worldbook.globalPrompts?.map((p, i) => (
               <div key={i} className="relative group">
                 <textarea 
@@ -270,9 +303,9 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
                 />
                 <button 
                   onClick={() => handleRemovePrompt('global', i)}
-                  className="absolute top-2 right-2 p-1 bg-red-50 text-red-500 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-2 right-2 p-1 bg-red-50 text-red-500 rounded-md transition-opacity"
                 >
-                  删除
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
