@@ -870,7 +870,10 @@ export function ChatScreen({
     // Split text by any of these tags, keeping the tags in the result
     const allTagsRegex = /([\[［【\(\{]\s*(?:TRANSFER|REQUEST|REFUND|RELATIVE_CARD|ORDER|STICKER|MUSIC|RECALL|QUOTE|ACTION[:：]?\s*CHECK_PHONE|ACTION[:：]?\s*IMAGE|LOCATION)[:：]?[^\]］】\)\}]+[\]］】\)\}]|\|\|\|)/gi;
     
-    const rawParts = text.split(allTagsRegex).filter(p => p && p.trim() !== '|||');
+    let rawParts = text.split(allTagsRegex).filter(p => p && p.trim() !== '|||');
+    if (isSegmentResponse) {
+      rawParts = rawParts.flatMap(p => p.split('\n').filter(l => l.trim()));
+    }
     const processedParts: any[] = [];
     let currentQuotedId = aiQuotedId;
     let orderItems: string[] = [];
@@ -1126,7 +1129,7 @@ export function ChatScreen({
     setShowPlusMenu(false);
     
     // AI response logic for group chat
-    if (currentGroupId && !theaterId) {
+    if (currentGroup && !theaterId) {
       // For now, let's pick one random member of the group to reply
       const otherMemberIds = currentGroup?.memberIds.filter(id => id !== 'user') || [];
       if (otherMemberIds.length > 0) {
@@ -1137,6 +1140,7 @@ export function ChatScreen({
           triggerAiResponse(text, randomPersona, true, userMsg.id);
         }
       }
+      return; // Added return to prevent fall-through
     }
 
     if (!currentPersona) return;
@@ -1151,6 +1155,7 @@ export function ChatScreen({
       pendingRequests.current = Math.max(0, pendingRequests.current - 1); // Decrement because we are replacing this request
     }
 
+    const personaForResponse = currentPersona;
     debouncedAiResponseTimeout.current = setTimeout(async () => {
       debouncedAiResponseTimeout.current = null; // Mark as executing
       try {
@@ -1158,7 +1163,7 @@ export function ChatScreen({
         await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 400));
         
         // Mark as read only if AI is online
-        if (!currentPersona.isOffline && !currentGroupId) {
+        if (!personaForResponse.isOffline && !currentGroupId) {
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
@@ -1166,7 +1171,7 @@ export function ChatScreen({
         if (msgType === 'transfer') {
           const receiptMsg: Message = {
             id: (Date.now() + 100).toString(),
-            personaId: currentPersona.id,
+            personaId: personaForResponse.id,
             role: 'model',
             text: '', 
             msgType: 'transfer',
@@ -1211,7 +1216,7 @@ export function ChatScreen({
           promptText = text;
         } else {
            // Main chat mode: Inject memories from theaters
-           const playedTheaters = Array.from(new Set(messagesRef.current.filter(m => m.personaId === currentPersona.id && m.theaterId).map(m => m.theaterId)));
+           const playedTheaters = Array.from(new Set(messagesRef.current.filter(m => m.personaId === personaForResponse.id && m.theaterId).map(m => m.theaterId)));
            let memoryText = '';
            if (playedTheaters.length > 0) {
              memoryText = `\n【平行世界记忆（剧场模式）】\n你和用户在平行世界（剧场模式）中共同经历了以下剧本的故事：${playedTheaters.join('、')}。\n这些是你们共同的珍贵回忆。虽然现在的对话发生在现实世界（微信聊天），但如果用户提起这些剧场里的事情，请带着那份情感和记忆进行回应，不要假装不知道。但在用户未提及时，请保持当前的现实人设，不要主动混淆现实与剧场。`;
@@ -1220,7 +1225,7 @@ export function ChatScreen({
         }
 
         // Get the latest messages for context (including the ones sent during debounce)
-        let latestMessages = messagesRef.current.filter(m => m.personaId === currentPersona.id && m.theaterId === theaterId).slice(-50); // Limit context size
+        let latestMessages = messagesRef.current.filter(m => m.personaId === personaForResponse.id && m.theaterId === theaterId).slice(-50); // Limit context size
         
         // If we are responding to an image, we'll pass it directly to fetchAiResponse in the prompt turn
         // to ensure the AI associates the system prompt with the image correctly.
@@ -1265,7 +1270,7 @@ export function ChatScreen({
         }));
 
         // Merge XHS history if available
-        const xhsHistory = xhsPrivateChats?.[currentPersona.id] || [];
+        const xhsHistory = xhsPrivateChats?.[personaForResponse.id] || [];
         const xhsContext = xhsHistory.map(m => ({
            role: m.isMe ? 'user' : 'assistant',
            content: `[来自小红书私信] ${m.text}`,
@@ -1285,7 +1290,7 @@ export function ChatScreen({
         const { responseText: responseTextWithQuote, functionCalls, imageDescription } = await fetchAiResponse(
           promptText, 
           contextMessages, 
-          currentPersona, 
+          personaForResponse, 
           apiSettings, 
           worldbook, 
           userProfile, 
@@ -1294,7 +1299,7 @@ export function ChatScreen({
           additionalSystemInstructions,
           undefined,
           undefined,
-          currentPersona.isOffline,
+          personaForResponse.isOffline,
           currentImageUrl
         );
 
@@ -1311,7 +1316,7 @@ export function ChatScreen({
         
         let finalResponseText = responseTextWithQuote;
         
-        const processed = processAiResponseParts(finalResponseText, undefined, currentPersona.isSegmentResponse);
+        const processed = processAiResponseParts(finalResponseText, undefined, personaForResponse.isSegmentResponse);
         const aiQuotedId = processed.quotedMessageId;
 
         if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
@@ -1507,19 +1512,23 @@ export function ChatScreen({
 
       const response = await fetchAiResponse(userText, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef);
       
-      const aiMsg: Message = {
-        id: (Date.now() + Math.random()).toString(),
-        personaId: persona.id,
-        groupId: isGroup ? currentGroupId || undefined : undefined,
-        role: 'model',
-        text: response.responseText,
-        msgType: 'text',
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        isRead: false,
-        createdAt: Date.now() + 500,
-      };
-      
-      setMessages(prev => [...prev, aiMsg]);
+      const texts = persona.isSegmentResponse ? response.responseText.split('\n').filter(t => t.trim()) : [response.responseText];
+
+      texts.forEach((text, index) => {
+        const aiMsg: Message = {
+          id: (Date.now() + Math.random() + index).toString(),
+          personaId: persona.id,
+          groupId: isGroup ? currentGroupId || undefined : undefined,
+          role: 'model',
+          text: text,
+          msgType: 'text',
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          isRead: false,
+          createdAt: Date.now() + 500 + (index * 1000),
+        };
+        
+        setMessages(prev => [...prev, aiMsg]);
+      });
     } catch (e) {
       console.error("Group AI Response Error:", e);
     } finally {
