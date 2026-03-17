@@ -118,6 +118,7 @@ export function ChatScreen({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
   const [showAiPhone, setShowAiPhone] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
 
   useEffect(() => {
     onAiPhoneToggle?.(showAiPhone);
@@ -275,30 +276,17 @@ export function ChatScreen({
         persona.isOffline
       );
 
-      let text = response.responseText;
-
-      if (text.includes('[NO_REPLY]')) {
+      const processed = processAiResponseParts(response.responseText, undefined, persona.isSegmentResponse);
+      
+      if (response.responseText.includes('[NO_REPLY]')) {
         setIsTyping(false);
         setUnreadPesterCount(prev => prev + 1); 
         return;
       }
       
-      const finalParts: string[] = [];
-      if (persona.isSegmentResponse) {
-        const segments = text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-        for (let i = 0; i < segments.length; i++) {
-          if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-            finalParts[finalParts.length - 1] += segments[i];
-          } else {
-            finalParts.push(segments[i].trim());
-          }
-        }
-      } else {
-        finalParts.push(text);
-      }
-
-      for (let i = 0; i < finalParts.length; i++) {
-        const partText = finalParts[i];
+      for (let i = 0; i < processed.parts.length; i++) {
+        const part = processed.parts[i];
+        const partText = part.text || '';
         const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
         setIsTyping(true);
         await new Promise(resolve => setTimeout(resolve, typingDelay));
@@ -308,6 +296,8 @@ export function ChatScreen({
           personaId: persona.id,
           role: 'model',
           text: partText,
+          msgType: part.msgType || 'text',
+          sticker: part.sticker,
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
           isRead: true, // Auto-read since user is looking at it?
           createdAt: Date.now()
@@ -316,6 +306,26 @@ export function ChatScreen({
       }
 
       setUnreadPesterCount(prev => prev + 1);
+      
+      // The nextTag is now handled by the useEffect that monitors messages
+      // because it's stripped from the text but processAiResponseParts doesn't save it to the message.
+      // Wait, if I strip it, the useEffect won't see it!
+      // I should probably append it back to the LAST message's text but hidden, 
+      // or handle the timer here.
+      
+      // Actually, the useEffect at line 184 checks lastMsg.text.
+      // If I strip it, it's gone.
+      // Let's append it back to the last message's text in a hidden way.
+      if (processed.nextTag) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          if (newMessages.length > 0) {
+            const last = newMessages[newMessages.length - 1];
+            last.text += ` ${processed.nextTag}`;
+          }
+          return newMessages;
+        });
+      }
 
     } catch (error: any) {
       if (error?.message?.includes('频率限制') || error?.message?.includes('429')) {
@@ -715,28 +725,14 @@ export function ChatScreen({
               return;
             }
 
-            const processed = processAiResponseParts(aiResponse.responseText);
+            const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
             const aiQuotedId = processed.quotedMessageId;
 
             if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
                onAiOrder(processed.orderItems, currentPersona.id);
             }
 
-            const finalParts: any[] = [];
-            for (const part of processed.parts) {
-              if (part.msgType === 'text' && currentPersona.isSegmentResponse) {
-                const segments = part.text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-                for (let i = 0; i < segments.length; i++) {
-                  if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-                    finalParts[finalParts.length - 1].text += segments[i];
-                  } else {
-                    finalParts.push({ msgType: 'text', text: segments[i].trim() });
-                  }
-                }
-              } else {
-                finalParts.push(part);
-              }
-            }
+            const finalParts = processed.parts;
 
             let lastAiMsg: Message | null = null;
 
@@ -833,8 +829,18 @@ export function ChatScreen({
     });
   };
 
-  const processAiResponseParts = (responseText: string | { responseText: string }, aiQuotedId?: string) => {
-    const text = typeof responseText === 'string' ? responseText : responseText.responseText;
+  const processAiResponseParts = (responseText: string | { responseText: string }, aiQuotedId?: string, isSegmentResponse?: boolean) => {
+    let text = typeof responseText === 'string' ? responseText : responseText.responseText;
+    
+    // Extract and remove ||NEXT:xxx|| tags
+    let nextTag: string | undefined;
+    const nextTagRegex = /\|\|NEXT:(IMMEDIATE|SHORT|LONG|STOP)\|\|/i;
+    const nextTagMatch = text.match(nextTagRegex);
+    if (nextTagMatch) {
+      nextTag = nextTagMatch[0];
+      text = text.replace(nextTagRegex, '').trim();
+    }
+
     // Regexes for special tags
     const transferRegex = /[\[［【\(\{]\s*TRANSFER[:：]?\s*([^\]］】\)\}]+)\s*[\]］】\)\}]/i;
     const requestRegex = /[\[［【\(\{]\s*REQUEST[:：]?\s*([^\]］】\)\}]+)\s*[\]］】\)\}]/i;
@@ -847,7 +853,7 @@ export function ChatScreen({
     const checkPhoneRegex = /[\[［【\(\{]\s*ACTION[:：]?\s*CHECK_PHONE\s*[\]］】\)\}]/i;
     const imageRegex = /[\[［【\(\{]\s*ACTION[:：]?\s*IMAGE[:：]?\s*([^\]］】\)\}]+)[\]］】\)\}]/i;
     const quoteRegex = /[\[［]QUOTE[:：]\s*([^\]］]+)[\]］]/i;
-    const innerVoiceRegex = /[（\(](.*?)[）\)]/g;
+    // const innerVoiceRegex = /[（\(](.*?)[）\)]/g; // Not used here
 
     // Split text by any of these tags, keeping the tags in the result
     const allTagsRegex = /([\[［【\(\{]\s*(?:TRANSFER|REQUEST|REFUND|RELATIVE_CARD|ORDER|STICKER|MUSIC|RECALL|QUOTE|ACTION[:：]?\s*CHECK_PHONE|ACTION[:：]?\s*IMAGE)[:：]?[^\]］】\)\}]+[\]］】\)\}]|\|\|\|)/gi;
@@ -918,7 +924,23 @@ export function ChatScreen({
         let cleanText = trimmedPart.replace(/[\[［]ID[:：]\s*[^\]］]+[\]］]/gi, '').trim();
         
         if (cleanText) {
-          processedParts.push({ msgType: 'text', text: cleanText });
+          if (isSegmentResponse) {
+            // Updated segmentation regex to be more comprehensive
+            const segments = cleanText.split(/([。！？\n!?]+|(?:\.\.\.+))/).filter((s: string) => s.trim().length > 0);
+            for (let i = 0; i < segments.length; i++) {
+              if (i > 0 && segments[i].match(/^[。！？\n!?.]+/)) {
+                if (processedParts.length > 0 && processedParts[processedParts.length - 1].msgType === 'text') {
+                  processedParts[processedParts.length - 1].text += segments[i];
+                } else {
+                  processedParts.push({ msgType: 'text', text: segments[i].trim() });
+                }
+              } else {
+                processedParts.push({ msgType: 'text', text: segments[i].trim() });
+              }
+            }
+          } else {
+            processedParts.push({ msgType: 'text', text: cleanText });
+          }
         }
       }
     }
@@ -928,7 +950,7 @@ export function ChatScreen({
       processedParts.push({ msgType: 'text', text: '...' });
     }
 
-    return { parts: processedParts, quotedMessageId: currentQuotedId, orderItems, shouldRecall, checkPhoneRequest };
+    return { parts: processedParts, quotedMessageId: currentQuotedId, orderItems, shouldRecall, checkPhoneRequest, nextTag };
   };
 
   const handleBacktrack = () => {
@@ -1203,7 +1225,7 @@ export function ChatScreen({
         
         let finalResponseText = responseTextWithQuote;
         
-        const processed = processAiResponseParts(finalResponseText);
+        const processed = processAiResponseParts(finalResponseText, undefined, currentPersona.isSegmentResponse);
         const aiQuotedId = processed.quotedMessageId;
 
         if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
@@ -1213,21 +1235,7 @@ export function ChatScreen({
         let lastAiMsgId: string | undefined;
 
         // Flatten all parts into a single sequence of messages
-        const finalParts: any[] = [];
-        for (const part of processed.parts) {
-          if (part.msgType === 'text' && currentPersona.isSegmentResponse) {
-            const segments = part.text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-            for (let i = 0; i < segments.length; i++) {
-              if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-                finalParts[finalParts.length - 1].text += segments[i];
-              } else {
-                finalParts.push({ msgType: 'text', text: segments[i].trim() });
-              }
-            }
-          } else {
-            finalParts.push(part);
-          }
-        }
+        const finalParts = processed.parts;
 
         for (let i = 0; i < finalParts.length; i++) {
           const part = finalParts[i];
@@ -1300,24 +1308,11 @@ export function ChatScreen({
                     content: `[ID: ${m.id}] ${m.id === lastAiMsgId ? '[此消息已撤回]' : (m.isRecalled ? '[此消息已撤回]' : m.text)}`
                   }));
                   const aiResponse = await fetchAiResponse(recallPrompt, recallContext, currentPersona, apiSettings, worldbook, userProfile, aiRef);
-                  const cleanedRecallResponse = aiResponse.responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').trim();
+                  const processedRecall = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
                   
-                  const finalParts: string[] = [];
-                  if (currentPersona.isSegmentResponse) {
-                    const segments = cleanedRecallResponse.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-                    for (let i = 0; i < segments.length; i++) {
-                      if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-                        finalParts[finalParts.length - 1] += segments[i];
-                      } else {
-                        finalParts.push(segments[i].trim());
-                      }
-                    }
-                  } else {
-                    finalParts.push(cleanedRecallResponse);
-                  }
-
-                  for (let i = 0; i < finalParts.length; i++) {
-                    const partText = finalParts[i];
+                  for (let i = 0; i < processedRecall.parts.length; i++) {
+                    const part = processedRecall.parts[i];
+                    const partText = part.text || '';
                     const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
                     setIsTyping(true);
                     await new Promise(resolve => setTimeout(resolve, typingDelay));
@@ -1327,13 +1322,26 @@ export function ChatScreen({
                       personaId: currentPersona.id,
                       role: 'model', 
                       text: partText,
-                      msgType: 'text',
+                      msgType: part.msgType || 'text',
+                      sticker: part.sticker,
                       timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
                       isRead: true,
                       createdAt: Date.now(),
                       theaterId
                     };
                     setMessages(prev => [...prev, newAiMsg]);
+                  }
+                  
+                  // Handle nextTag for recall response
+                  if (processedRecall.nextTag) {
+                    setMessages(prev => {
+                      const newMessages = [...prev];
+                      if (newMessages.length > 0) {
+                        const last = newMessages[newMessages.length - 1];
+                        last.text += ` ${processedRecall.nextTag}`;
+                      }
+                      return newMessages;
+                    });
                   }
                 } catch (e) {
                   console.error("AI recall error:", e);
@@ -1431,28 +1439,14 @@ export function ChatScreen({
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
-        const processed = processAiResponseParts(aiResponse.responseText);
+        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
         const aiQuotedId = processed.quotedMessageId;
 
         if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
            onAiOrder(processed.orderItems, currentPersona.id);
         }
 
-        const finalParts: any[] = [];
-        for (const part of processed.parts) {
-          if (part.msgType === 'text' && currentPersona.isSegmentResponse) {
-            const segments = part.text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-            for (let i = 0; i < segments.length; i++) {
-              if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-                finalParts[finalParts.length - 1].text += segments[i];
-              } else {
-                finalParts.push({ msgType: 'text', text: segments[i].trim() });
-              }
-            }
-          } else {
-            finalParts.push(part);
-          }
-        }
+        const finalParts = processed.parts;
 
         for (let i = 0; i < finalParts.length; i++) {
           const part = finalParts[i];
@@ -1484,6 +1478,13 @@ export function ChatScreen({
         setIsTyping(pendingRequests.current > 0);
       }
     }
+  };
+
+  const handleFavorite = (id: string) => {
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, isFavorited: !m.isFavorited } : m));
+    setActiveMessageMenu(null);
+    setShowSaveToast(true);
+    setTimeout(() => setShowSaveToast(false), 2000);
   };
 
   const handleDeleteMessage = (msgId: string) => {
@@ -1563,22 +1564,11 @@ export function ChatScreen({
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
-        const finalParts: string[] = [];
-        if (currentPersona.isSegmentResponse) {
-          const segments = aiResponse.responseText.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-          for (let i = 0; i < segments.length; i++) {
-            if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-              finalParts[finalParts.length - 1] += segments[i];
-            } else {
-              finalParts.push(segments[i].trim());
-            }
-          }
-        } else {
-          finalParts.push(aiResponse.responseText);
-        }
-
-        for (let i = 0; i < finalParts.length; i++) {
-          const partText = finalParts[i];
+        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+        
+        for (let i = 0; i < processed.parts.length; i++) {
+          const part = processed.parts[i];
+          const partText = part.text || '';
           const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
           setIsTyping(true);
           await new Promise(resolve => setTimeout(resolve, typingDelay));
@@ -1588,12 +1578,25 @@ export function ChatScreen({
             personaId: currentPersona.id,
             role: 'model', 
             text: partText,
-            msgType: 'text',
+            msgType: part.msgType || 'text',
+            sticker: part.sticker,
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
             isRead: true,
             createdAt: Date.now()
           };
           setMessages(prev => [...prev, aiMsg]);
+        }
+        
+        // Handle nextTag
+        if (processed.nextTag) {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            if (newMessages.length > 0) {
+              const last = newMessages[newMessages.length - 1];
+              last.text += ` ${processed.nextTag}`;
+            }
+            return newMessages;
+          });
         }
       } catch (e) {
         console.error("AI pat response error:", e);
@@ -1650,7 +1653,7 @@ export function ChatScreen({
         undefined,
         true
       );
-      const processed = processAiResponseParts(aiResponse.responseText);
+      const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
       let innerVoiceText = processed.parts.map(p => p.text).join(' ');
       
       // Extract mood
@@ -1742,28 +1745,14 @@ export function ChatScreen({
       
       let finalResponseText = aiResponse.responseText;
       
-      const processed = processAiResponseParts(finalResponseText);
+      const processed = processAiResponseParts(finalResponseText, undefined, currentPersona.isSegmentResponse);
       const aiQuotedId = processed.quotedMessageId;
 
       if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
          onAiOrder(processed.orderItems, currentPersona.id);
       }
 
-      const finalParts: any[] = [];
-      for (const part of processed.parts) {
-        if (part.msgType === 'text' && currentPersona.isSegmentResponse) {
-          const segments = part.text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
-          for (let i = 0; i < segments.length; i++) {
-            if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
-              finalParts[finalParts.length - 1].text += segments[i];
-            } else {
-              finalParts.push({ msgType: 'text', text: segments[i].trim() });
-            }
-          }
-        } else {
-          finalParts.push(part);
-        }
-      }
+      const finalParts = processed.parts;
 
       for (let i = 0; i < finalParts.length; i++) {
         const part = finalParts[i];
@@ -1794,6 +1783,18 @@ export function ChatScreen({
         
         setMessages(prev => {
           return [...prev, aiMsg];
+        });
+      }
+
+      // Handle nextTag
+      if (processed.nextTag) {
+        setMessages(prev => {
+          const newMessages = [...prev];
+          if (newMessages.length > 0) {
+            const last = newMessages[newMessages.length - 1];
+            last.text += ` ${processed.nextTag}`;
+          }
+          return newMessages;
         });
       }
     } catch (error: any) {
@@ -2862,6 +2863,11 @@ ${recentMessages}
                                   />
                                 </div>
                               )}
+                              {msg.isFavorited && (
+                                <div className={`absolute -bottom-1 ${msg.role === 'user' ? '-left-1' : '-right-1'} bg-white rounded-full p-0.5 shadow-sm border border-neutral-100`}>
+                                  <Heart size={10} className="text-yellow-500 fill-current" />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <>
@@ -2887,6 +2893,11 @@ ${recentMessages}
                                     alt="uploaded image" 
                                     referrerPolicy="no-referrer"
                                   />
+                                </div>
+                              )}
+                              {msg.isFavorited && (
+                                <div className={`absolute -bottom-1 ${msg.role === 'user' ? '-left-1' : '-right-1'} bg-white rounded-full p-0.5 shadow-sm border border-neutral-100`}>
+                                  <Heart size={10} className="text-yellow-500 fill-current" />
                                 </div>
                               )}
                             </>
@@ -4174,7 +4185,10 @@ ${recentMessages}
 
               <div className="h-2" />
 
-              <div className="bg-white p-4 flex items-center justify-between active:bg-neutral-50 cursor-pointer">
+              <div 
+                onClick={() => setShowFavorites(true)}
+                className="bg-white p-4 flex items-center justify-between active:bg-neutral-50 cursor-pointer"
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-500">
                     <Bookmark size={18} />
@@ -5357,6 +5371,16 @@ ${recentMessages}
                   )}
 
                   <button 
+                    onClick={() => handleFavorite(msg.id)}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <div className={`w-14 h-14 ${msg.isFavorited ? 'bg-yellow-100 text-yellow-500' : 'bg-yellow-50 text-yellow-400'} rounded-2xl flex items-center justify-center active:scale-90 transition-transform`}>
+                      <Heart size={24} className={msg.isFavorited ? 'fill-current' : ''} />
+                    </div>
+                    <span className="text-[12px] text-neutral-600 font-medium">{msg.isFavorited ? '取消收藏' : '收藏'}</span>
+                  </button>
+
+                  <button 
                     onClick={() => {
                       setQuotedMessage(msg);
                       setActiveMessageMenu(null);
@@ -5429,6 +5453,81 @@ ${recentMessages}
           theme={theme}
         />
       )}
+
+      {/* Favorites Modal */}
+      <AnimatePresence>
+        {showFavorites && (
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed inset-0 z-[150] bg-neutral-100 flex flex-col"
+          >
+            <div className={`bg-white px-4 pb-4 flex items-center justify-between border-b border-neutral-100 ${theme.showStatusBar !== false ? 'pt-12' : 'pt-8'}`}>
+              <button onClick={() => setShowFavorites(false)} className="p-2 -ml-2 text-neutral-800 active:opacity-60">
+                <ChevronLeft size={24} />
+              </button>
+              <h1 className="text-[17px] font-bold text-neutral-900">收藏</h1>
+              <div className="w-10" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.filter(m => m.isFavorited).length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-neutral-400 gap-4">
+                  <Bookmark size={48} className="opacity-20" />
+                  <p className="text-sm">暂无收藏内容</p>
+                </div>
+              ) : (
+                messages.filter(m => m.isFavorited).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(msg => {
+                  const persona = personas.find(p => p.id === msg.personaId);
+                  return (
+                    <div key={msg.id} className="bg-white rounded-xl p-4 shadow-sm space-y-3 active:bg-neutral-50 transition-colors relative group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <img 
+                            src={msg.role === 'user' ? (userProfile.avatarUrl || 'https://picsum.photos/seed/user/100/100') : (persona?.avatarUrl || 'https://picsum.photos/seed/ai/100/100')} 
+                            className="w-6 h-6 rounded-md object-cover"
+                            alt="avatar"
+                          />
+                          <span className="text-xs font-medium text-neutral-500">
+                            {msg.role === 'user' ? userProfile.name : (persona?.name || '未知')}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-neutral-400">
+                          {msg.createdAt ? new Date(msg.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : msg.timestamp}
+                        </span>
+                      </div>
+                      
+                      <div className="text-[15px] text-neutral-800 leading-relaxed break-words">
+                        {msg.msgType === 'image' ? (
+                          <div className="space-y-2">
+                            <img src={msg.imageUrl} className="max-w-full rounded-lg max-h-48 object-cover" alt="Favorited Image" />
+                            {msg.text && <p>{msg.text}</p>}
+                          </div>
+                        ) : msg.msgType === 'sticker' ? (
+                          <img src={msg.sticker} className="w-20 h-20 object-contain" alt="Sticker" />
+                        ) : (
+                          <p>{msg.text}</p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end pt-2 border-t border-neutral-50">
+                        <button 
+                          onClick={() => handleFavorite(msg.id)}
+                          className="text-xs text-red-500 font-medium px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
+                        >
+                          取消收藏
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Wallet Modal */}
       {showActualWallet && (

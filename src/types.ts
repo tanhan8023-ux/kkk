@@ -272,6 +272,7 @@ export interface Message {
   status?: 'sent' | 'delivered' | 'read';
   createdAt?: number;
   isRecalled?: boolean;
+  isFavorited?: boolean;
   quotedMessageId?: string;
   isRequest?: boolean;
   isRefund?: boolean;
