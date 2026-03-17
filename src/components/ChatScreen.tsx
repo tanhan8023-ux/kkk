@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse } from 'lucide-react';
-import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen } from '../types';
+import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Navigation, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse } from 'lucide-react';
+import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen, GroupChat } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
 import { fetchAiResponse as originalFetchAiResponse, generateMoment, checkIfPersonaIsOffline, summarizeChat, extractAndSaveMemory } from '../services/aiService';
@@ -48,6 +48,10 @@ interface Props {
   unreadCount: number;
   currentChatId: string | null;
   setCurrentChatId: (id: string | null) => void;
+  groups: GroupChat[];
+  currentGroupId: string | null;
+  setCurrentGroupId: (id: string | null) => void;
+  onCreateGroup: (name: string, memberIds: string[]) => void;
   onAiOrder: (items: string[], personaId: string) => void;
   onStartListeningWith?: (id: string) => void;
   listeningWithPersonaId?: string | null;
@@ -84,7 +88,9 @@ const renderTextWithStickers = (text: string) => {
 export function ChatScreen({ 
   personas, setPersonas, userProfile, setUserProfile, apiSettings, theme, worldbook, 
   messages, setMessages, moments, setMoments, onClearUnread, onBack, onNavigate, 
-  isActive, unreadCount, currentChatId, setCurrentChatId, onAiOrder,
+  isActive, unreadCount, currentChatId, setCurrentChatId, 
+  groups, currentGroupId, setCurrentGroupId, onCreateGroup,
+  onAiOrder,
   onStartListeningWith,
   listeningWithPersonaId, currentSong, isPlaying, onMusicClick,
   xhsPrivateChats,
@@ -623,18 +629,22 @@ export function ChatScreen({
   };
 
   const currentPersona = personas.find(p => p.id === currentChatId);
+  const currentGroup = groups.find(g => g.id === currentGroupId);
 
   const theaterMessages = React.useMemo(() => {
-    if (!activeTheaterScript || !currentPersona) return [];
+    if (!activeTheaterScript || !currentPersona || currentGroupId) return [];
     return messages.filter(m => m.personaId === currentPersona.id && m.theaterId === activeTheaterScript.title);
-  }, [messages, currentChatId, activeTheaterScript, currentPersona]);
+  }, [messages, currentChatId, currentGroupId, activeTheaterScript, currentPersona]);
 
   const currentMessages = React.useMemo(() => {
+    if (currentGroupId) {
+      return messages.filter(m => m.groupId === currentGroupId && !m.hidden);
+    }
     if (activeTheaterScript) {
       return theaterMessages;
     }
     return messages.filter(m => m.personaId === currentChatId && !m.theaterId && !m.hidden);
-  }, [messages, currentChatId, activeTheaterScript, theaterMessages]);
+  }, [messages, currentChatId, currentGroupId, activeTheaterScript, theaterMessages]);
 
   // Inject custom CSS into a style tag for better compatibility and power
   useEffect(() => {
@@ -757,6 +767,7 @@ export function ChatScreen({
                 isRequest: part.isRequest,
                 isRefund: part.isRefund,
                 isInnerVoice: part.isInnerVoice,
+                location: part.location,
                 timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
                 isRead: true,
                 createdAt: Date.now(),
@@ -852,11 +863,12 @@ export function ChatScreen({
     const recallRegex = /[\[［【\(\{]\s*RECALL\s*[\]］】\)\}]/i;
     const checkPhoneRegex = /[\[［【\(\{]\s*ACTION[:：]?\s*CHECK_PHONE\s*[\]］】\)\}]/i;
     const imageRegex = /[\[［【\(\{]\s*ACTION[:：]?\s*IMAGE[:：]?\s*([^\]］】\)\}]+)[\]］】\)\}]/i;
+    const locationRegex = /[\[［【\(\{]\s*LOCATION[:：]?\s*([^\]］】\)\}]+)\s*[\]］】\)\}]/i;
     const quoteRegex = /[\[［]QUOTE[:：]\s*([^\]］]+)[\]］]/i;
     // const innerVoiceRegex = /[（\(](.*?)[）\)]/g; // Not used here
 
     // Split text by any of these tags, keeping the tags in the result
-    const allTagsRegex = /([\[［【\(\{]\s*(?:TRANSFER|REQUEST|REFUND|RELATIVE_CARD|ORDER|STICKER|MUSIC|RECALL|QUOTE|ACTION[:：]?\s*CHECK_PHONE|ACTION[:：]?\s*IMAGE)[:：]?[^\]］】\)\}]+[\]］】\)\}]|\|\|\|)/gi;
+    const allTagsRegex = /([\[［【\(\{]\s*(?:TRANSFER|REQUEST|REFUND|RELATIVE_CARD|ORDER|STICKER|MUSIC|RECALL|QUOTE|ACTION[:：]?\s*CHECK_PHONE|ACTION[:：]?\s*IMAGE|LOCATION)[:：]?[^\]］】\)\}]+[\]］】\)\}]|\|\|\|)/gi;
     
     const rawParts = text.split(allTagsRegex).filter(p => p && p.trim() !== '|||');
     const processedParts: any[] = [];
@@ -916,6 +928,17 @@ export function ChatScreen({
         const match = trimmedPart.match(imageRegex)!;
         const imageUrl = match[1].trim();
         processedParts.push({ msgType: 'sticker', sticker: imageUrl });
+      } else if (trimmedPart.match(locationRegex)) {
+        const match = trimmedPart.match(locationRegex)!;
+        const content = match[1].trim();
+        const parts = content.split(/[,，、]/);
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        const address = parts.slice(2).join(',').trim();
+        processedParts.push({ 
+          msgType: 'location', 
+          location: { latitude: lat, longitude: lng, address: address || undefined } 
+        });
       } else if (trimmedPart.match(quoteRegex)) {
         const match = trimmedPart.match(quoteRegex)!;
         currentQuotedId = match[1].trim();
@@ -997,8 +1020,51 @@ export function ChatScreen({
     }
   };
 
-  const handleSend = async (text: string, msgType: 'text' | 'transfer' | 'relativeCard' | 'sticker' | 'listenTogether' | 'system' | 'image' = 'text', amount?: number, transferNote?: string, relativeCard?: { limit: number; status: 'active' | 'cancelled' }, sticker?: string, theaterId?: string, imageUrl?: string, hidden?: boolean, imageDescription?: string) => {
-    if ((!text.trim() && msgType === 'text') || !currentPersona) return;
+  const handleShareLocation = async () => {
+    // Prioritize address from theme settings if available
+    if (theme.weatherLocation && theme.weatherLocation.trim()) {
+      const address = theme.weatherLocation.trim();
+      // Try to parse coordinates if they are in the string (e.g. "lat, lng, address")
+      const parts = address.split(/[,，]/);
+      let lat = 31.2304; // Default to Shanghai if no coords
+      let lng = 121.4737;
+      let finalAddress = address;
+
+      if (parts.length >= 2) {
+        const p1 = parseFloat(parts[0]);
+        const p2 = parseFloat(parts[1]);
+        if (!isNaN(p1) && !isNaN(p2)) {
+          lat = p1;
+          lng = p2;
+          finalAddress = parts.slice(2).join(',').trim() || address;
+        }
+      }
+
+      handleSend(`[位置: ${finalAddress}]`, 'location', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { latitude: lat, longitude: lng, address: finalAddress });
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      alert("浏览器不支持地理位置");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        // You could use a reverse geocoding API here to get the address
+        // For now, let's just use a placeholder
+        handleSend(`[位置: ${latitude}, ${longitude}, 正在获取位置...]`, 'location', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { latitude, longitude, address: '正在获取位置...' });
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert("无法获取位置，请检查权限设置");
+      }
+    );
+  };
+
+  const handleSend = async (text: string, msgType: 'text' | 'transfer' | 'relativeCard' | 'sticker' | 'listenTogether' | 'system' | 'image' | 'location' = 'text', amount?: number, transferNote?: string, relativeCard?: { limit: number; status: 'active' | 'cancelled' }, sticker?: string, theaterId?: string, imageUrl?: string, hidden?: boolean, imageDescription?: string, location?: { latitude: number; longitude: number; address?: string }) => {
+    if ((!text.trim() && msgType === 'text') || (!currentPersona && !currentGroup)) return;
 
     // Prevent double sending
     if (!theaterId) {
@@ -1010,7 +1076,8 @@ export function ChatScreen({
     const timestamp = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     const userMsg: Message = { 
       id: Date.now().toString(), 
-      personaId: currentPersona.id, 
+      personaId: currentChatId || '',
+      groupId: currentGroupId || undefined,
       role: 'user', 
       text: text.trim(), 
       msgType, 
@@ -1019,8 +1086,10 @@ export function ChatScreen({
       relativeCard,
       sticker,
       imageUrl,
+      location,
       timestamp, 
       isRead: false, 
+      readBy: [],
       status: 'sent', 
       createdAt: Date.now(),
       quotedMessageId: quotedMessage?.id,
@@ -1030,12 +1099,12 @@ export function ChatScreen({
     };
     setMessages(prev => [...prev, userMsg]);
 
-    if (msgType === 'listenTogether' && onStartListeningWith) {
-      onStartListeningWith(currentPersona.id);
+    if (msgType === 'listenTogether' && onStartListeningWith && currentChatId) {
+      onStartListeningWith(currentChatId);
     }
 
     // Record transaction for user transfer
-    if (msgType === 'transfer' && amount) {
+    if (msgType === 'transfer' && amount && currentPersona) {
       const newTx: Transaction = {
         id: Date.now().toString() + '-user',
         type: 'payment',
@@ -1056,6 +1125,22 @@ export function ChatScreen({
     setQuotedMessage(null);
     setShowPlusMenu(false);
     
+    // AI response logic for group chat
+    if (currentGroupId && !theaterId) {
+      // For now, let's pick one random member of the group to reply
+      const otherMemberIds = currentGroup?.memberIds.filter(id => id !== 'user') || [];
+      if (otherMemberIds.length > 0) {
+        const randomMemberId = otherMemberIds[Math.floor(Math.random() * otherMemberIds.length)];
+        const randomPersona = personas.find(p => p.id === randomMemberId);
+        if (randomPersona) {
+          // Trigger AI response for this persona in the group
+          triggerAiResponse(text, randomPersona, true, userMsg.id);
+        }
+      }
+    }
+
+    if (!currentPersona) return;
+
     pendingRequests.current += 1;
     setIsTyping(pendingRequests.current > 0);
 
@@ -1073,7 +1158,7 @@ export function ChatScreen({
         await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 400));
         
         // Mark as read only if AI is online
-        if (!currentPersona.isOffline) {
+        if (!currentPersona.isOffline && !currentGroupId) {
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
@@ -1173,6 +1258,7 @@ export function ChatScreen({
                    m.msgType === 'listenTogether' ? `[发起了“一起听歌”邀请]` :
                    m.msgType === 'sticker' ? `[STICKER: 表情包]` :
                    m.msgType === 'image' ? `[图片描述: ${m.imageDescription || '一张图片'}]` :
+                   m.msgType === 'location' ? `[位置共享: ${m.location?.address || `${m.location?.latitude}, ${m.location?.longitude}`}]` :
                    cleanContextMessage(m.text))}`,
           imageUrl: m.imageUrl,
           timestamp: m.createdAt || 0
@@ -1258,6 +1344,7 @@ export function ChatScreen({
             isRequest: part.isRequest,
             isRefund: part.isRefund,
             isInnerVoice: part.isInnerVoice,
+            location: part.location,
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
             isRead: true,
             createdAt: Date.now(),
@@ -1394,6 +1481,53 @@ export function ChatScreen({
     }, 600);
   };
 
+  const triggerAiResponse = async (userText: string, persona: Persona, isGroup: boolean = false, userMsgId?: string) => {
+    pendingRequests.current += 1;
+    setIsTyping(pendingRequests.current > 0);
+
+    if (isGroup && userMsgId) {
+      setMessages(prev => prev.map(m => m.id === userMsgId ? { ...m, readBy: Array.from(new Set([...(m.readBy || []), persona.id])) } : m));
+    }
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000));
+      
+      const contextMessages = messages
+        .filter(m => (isGroup ? m.groupId === currentGroupId : m.personaId === persona.id) && !m.hidden)
+        .slice(-15)
+        .map(m => {
+          let role = m.role === 'model' ? 'assistant' : 'user';
+          let content = m.text;
+          if (isGroup && m.role === 'model') {
+            const sender = personas.find(p => p.id === m.personaId);
+            content = `[${sender?.name || '未知'}]: ${content}`;
+          }
+          return { role, content };
+        });
+
+      const response = await fetchAiResponse(userText, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef);
+      
+      const aiMsg: Message = {
+        id: (Date.now() + Math.random()).toString(),
+        personaId: persona.id,
+        groupId: isGroup ? currentGroupId || undefined : undefined,
+        role: 'model',
+        text: response.responseText,
+        msgType: 'text',
+        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        isRead: false,
+        createdAt: Date.now() + 500,
+      };
+      
+      setMessages(prev => [...prev, aiMsg]);
+    } catch (e) {
+      console.error("Group AI Response Error:", e);
+    } finally {
+      pendingRequests.current = Math.max(0, pendingRequests.current - 1);
+      setIsTyping(pendingRequests.current > 0);
+    }
+  };
+
   const handleRecall = async (msgId: string) => {
     const msg = messages.find(m => m.id === msgId);
     if (!msg) return;
@@ -1464,6 +1598,7 @@ export function ChatScreen({
             sticker: part.sticker,
             isRequest: part.isRequest,
             isRefund: part.isRefund,
+            location: part.location,
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
             isRead: true,
             createdAt: Date.now(),
@@ -1580,6 +1715,7 @@ export function ChatScreen({
             text: partText,
             msgType: part.msgType || 'text',
             sticker: part.sticker,
+            location: part.location,
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
             isRead: true,
             createdAt: Date.now()
@@ -1775,6 +1911,7 @@ export function ChatScreen({
           isRequest: part.isRequest,
           isRefund: part.isRefund,
           isInnerVoice: part.isInnerVoice,
+          location: part.location,
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
           isRead: true,
           createdAt: Date.now(),
@@ -2145,8 +2282,8 @@ ${recentMessages}
     >
       {/* Header */}
       <div className="h-12 flex items-center px-2 bg-neutral-100 border-b border-neutral-200 shrink-0 z-[70]">
-        {activeTab === 'chat' && currentChatId ? (
-          <button onClick={() => setCurrentChatId(null)} className="text-neutral-800 p-2 active:opacity-70 flex items-center z-50">
+        {activeTab === 'chat' && (currentChatId || currentGroupId) ? (
+          <button onClick={() => { setCurrentChatId(null); setCurrentGroupId(null); }} className="text-neutral-800 p-2 active:opacity-70 flex items-center z-50">
             <ChevronLeft size={24} />
           </button>
         ) : activeTab === 'theater' ? (
@@ -2162,22 +2299,23 @@ ${recentMessages}
         <div className="flex-1 text-center pr-2">
           <h1 className="font-semibold text-neutral-900 text-[16px]">
             {activeTab === 'chat' 
-              ? (currentChatId ? currentPersona?.name : '微信') 
+              ? (currentChatId ? currentPersona?.name : (currentGroupId ? currentGroup?.name : '微信')) 
               : activeTab === 'contacts' ? '通讯录'
               : activeTab === 'theater' ? '剧场'
               : activeTab === 'moments' ? '朋友圈' : '收藏'}
           </h1>
-          {activeTab === 'chat' && currentChatId && (
+          {activeTab === 'chat' && (currentChatId || currentGroupId) && (
             <div className="text-[11px] text-neutral-500">
               {(() => {
                 if (isTyping) return '对方正在输入...';
+                if (currentGroupId) return `${currentGroup?.memberIds.length || 0} 位成员`;
                 return currentPersona?.isOffline ? '离线' : '在线';
               })()}
             </div>
           )}
         </div>
 
-        {activeTab === 'chat' && !currentChatId && (
+        {activeTab === 'chat' && !currentChatId && !currentGroupId && (
           <div className="flex items-center gap-1 z-50">
             <button 
               onClick={() => {
@@ -2249,7 +2387,7 @@ ${recentMessages}
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative">
         {/* Chat List View */}
-        {activeTab === 'chat' && !currentChatId && (
+        {activeTab === 'chat' && !currentChatId && !currentGroupId && (
           <div className="absolute inset-0 bg-white overflow-y-auto pb-[80px]">
             <ChatListView 
               personas={personas}
@@ -2258,6 +2396,9 @@ ${recentMessages}
               setCurrentChatId={setCurrentChatId}
               defaultAiAvatar={defaultAiAvatar}
               formatRelativeTime={formatRelativeTime}
+              groups={groups}
+              setCurrentGroupId={setCurrentGroupId}
+              onCreateGroup={onCreateGroup}
             />
           </div>
         )}
@@ -2409,7 +2550,7 @@ ${recentMessages}
         )}
 
         {/* Direct Message View */}
-        {activeTab === 'chat' && currentChatId && (
+        {activeTab === 'chat' && (currentChatId || currentGroupId) && (
           <div 
             className="absolute inset-0 flex flex-col bg-neutral-100" 
             onClick={() => setShowChatSettings(false)}
@@ -2420,7 +2561,7 @@ ${recentMessages}
             }}
           >
             {/* Mini Music Widget */}
-            {listeningWithPersonaId && currentSong && (
+            {listeningWithPersonaId && currentSong && !currentGroupId && (
               <motion.div 
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -2450,7 +2591,7 @@ ${recentMessages}
             <div className="flex-1 min-h-0 p-4 overflow-y-auto flex flex-col gap-4 pb-8 pt-4" onScroll={handleScroll}>
               {currentMessages.length === 0 && (
                 <div className="flex-1 flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-                  和 {currentPersona?.name || '你的 AI'} 打个招呼吧！
+                  {currentGroupId ? `欢迎来到 ${currentGroup?.name}` : `和 ${currentPersona?.name || '你的 AI'} 打个招呼吧！`}
                 </div>
               )}
               {currentMessages.slice(-100).map((msg) => {
@@ -2584,28 +2725,36 @@ ${recentMessages}
                     <div className="relative mr-3 shrink-0 cursor-pointer active:scale-95 transition-transform" onClick={() => handleAvatarClick(msg)} onDoubleClick={() => handlePat('model')}>
                     <div className="relative w-10 h-10 shrink-0">
                       <img 
-                        src={currentPersona?.avatarUrl || defaultAiAvatar} 
+                        src={(currentGroupId ? (personas.find(p => p.id === msg.personaId)?.avatarUrl || defaultAiAvatar) : (currentPersona?.avatarUrl || defaultAiAvatar))} 
                         className="w-10 h-10 rounded-lg object-cover" 
                         alt="avatar" 
                       />
-                      {currentPersona?.avatarFrame && (
-                        <img 
-                          src={currentPersona.avatarFrame} 
-                          className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] object-contain pointer-events-none z-10 select-none"
-                          alt="frame"
-                          style={{ 
-                            filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))', 
-                            transform: `translate(${currentPersona.avatarFrameX || 0}px, ${currentPersona.avatarFrameY || 0}px) scale(${currentPersona.avatarFrameScale || 1})` 
-                          }}
-                        />
-                      )}
-                      {currentPersona?.avatarPendant && (
-                        <img 
-                          src={currentPersona.avatarPendant} 
-                          className="absolute -top-1 -right-1 w-5 h-5 object-contain pointer-events-none z-20 select-none"
-                          alt="pendant"
-                        />
-                      )}
+                      {(() => {
+                        const p = currentGroupId ? personas.find(p => p.id === msg.personaId) : currentPersona;
+                        if (!p?.avatarFrame) return null;
+                        return (
+                          <img 
+                            src={p.avatarFrame} 
+                            className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] object-contain pointer-events-none z-10 select-none"
+                            alt="frame"
+                            style={{ 
+                              filter: 'drop-shadow(0 0 4px rgba(0,0,0,0.1))', 
+                              transform: `translate(${p.avatarFrameX || 0}px, ${p.avatarFrameY || 0}px) scale(${p.avatarFrameScale || 1})` 
+                            }}
+                          />
+                        );
+                      })()}
+                      {(() => {
+                        const p = currentGroupId ? personas.find(p => p.id === msg.personaId) : currentPersona;
+                        if (!p?.avatarPendant) return null;
+                        return (
+                          <img 
+                            src={p.avatarPendant} 
+                            className="absolute -top-1 -right-1 w-5 h-5 object-contain pointer-events-none z-20 select-none"
+                            alt="pendant"
+                          />
+                        );
+                      })()}
                     </div>
                   </div>
                   )}
@@ -2614,7 +2763,11 @@ ${recentMessages}
                     <div className="flex flex-col items-end mr-2 justify-end pb-1 shrink-0">
                       {msg.timestamp && <span className="text-[10px] text-neutral-400 mb-0.5">{msg.timestamp}</span>}
                       <span className={`text-[10px] ${msg.status === 'read' || msg.isRead ? 'text-neutral-400' : 'text-blue-500'}`}>
-                        {msg.status === 'read' || msg.isRead ? '已读' : msg.status === 'delivered' ? '未读' : msg.status === 'sent' ? '已发送' : '未读'}
+                        {msg.groupId ? (
+                          `已读: ${msg.readBy?.length || 0}`
+                        ) : (
+                          msg.status === 'read' || msg.isRead ? '已读' : msg.status === 'delivered' ? '未读' : msg.status === 'sent' ? '已发送' : '未读'
+                        )}
                       </span>
                     </div>
                   )}
@@ -2638,6 +2791,11 @@ ${recentMessages}
                       )}
 
                       <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        {currentGroupId && msg.role === 'model' && (
+                          <span className="text-[11px] text-neutral-500 mb-0.5 ml-1">
+                            {personas.find(p => p.id === msg.personaId)?.name || '未知'}
+                          </span>
+                        )}
                         {msg.msgType === 'xhsPost' && msg.xhsPost ? (
                           <div 
                             className={`flex flex-col gap-2 rounded-xl p-3 w-64 shadow-sm ${msg.role === 'user' ? 'custom-bubble-user' : 'custom-bubble-ai'}`}
@@ -2701,6 +2859,32 @@ ${recentMessages}
                                 {msg.taobaoProduct.sales && <span className="text-[10px] text-neutral-400">已售{msg.taobaoProduct.sales}</span>}
                               </div>
                               {msg.taobaoProduct.shop && <div className="text-[10px] text-neutral-400 truncate">{msg.taobaoProduct.shop}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      ) : msg.msgType === 'location' && msg.location ? (
+                        <div 
+                          className={`flex flex-col rounded-xl overflow-hidden w-64 shadow-sm bg-white border border-neutral-200 ${msg.role === 'user' ? 'custom-bubble-user' : 'custom-bubble-ai'}`}
+                          onClick={() => {
+                            onNavigate('virtualmap');
+                          }}
+                        >
+                          <div className="p-3">
+                            <div className="text-[15px] font-medium text-neutral-900 truncate">{msg.location.address || '位置共享'}</div>
+                            <div className="text-[12px] text-neutral-500 truncate">
+                              {msg.location.latitude.toFixed(4)}, {msg.location.longitude.toFixed(4)}
+                            </div>
+                          </div>
+                          <div className="h-32 bg-neutral-100 relative overflow-hidden">
+                            <img 
+                              src={`https://api.dicebear.com/7.x/identicon/svg?seed=${msg.location.latitude},${msg.location.longitude}`} 
+                              className="w-full h-full object-cover opacity-30" 
+                              alt="Map placeholder" 
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg animate-pulse">
+                                <Navigation size={18} />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3299,6 +3483,30 @@ ${recentMessages}
                   <CreditCard size={28} />
                 </div>
                 <span className="text-[12px] text-neutral-500">亲属卡</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  handleShareLocation();
+                }} 
+                className="flex flex-col items-center gap-2"
+              >
+                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-neutral-700 shadow-sm">
+                  <Compass size={28} />
+                </div>
+                <span className="text-[12px] text-neutral-500">位置</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  onNavigate('virtualmap');
+                }} 
+                className="flex flex-col items-center gap-2"
+              >
+                <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-neutral-700 shadow-sm">
+                  <Navigation size={28} className="text-blue-500" />
+                </div>
+                <span className="text-[12px] text-neutral-500">虚拟地图</span>
               </button>
             </div>
           )}

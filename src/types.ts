@@ -20,6 +20,12 @@ export interface Persona {
   context?: string;
   statusMessage?: string;
   isOffline?: boolean;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+    lastUpdated?: number;
+  };
   hasBlockedUser?: boolean;
   isBlockedByUser?: boolean;
   aiPhoneSettings?: {
@@ -244,10 +250,16 @@ declare global {
 export interface Message {
   id: string;
   personaId: string;
+  groupId?: string;
   role: 'user' | 'model' | 'system';
   text: string;
-  msgType?: 'text' | 'transfer' | 'music' | 'system' | 'xhsPost' | 'taobaoProduct' | 'relativeCard' | 'sticker' | 'thought' | 'listenTogether' | 'checkPhoneRequest' | 'image';
+  msgType?: 'text' | 'transfer' | 'music' | 'system' | 'xhsPost' | 'taobaoProduct' | 'relativeCard' | 'sticker' | 'thought' | 'listenTogether' | 'checkPhoneRequest' | 'image' | 'location';
   imageUrl?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
   amount?: number;
   transferNote?: string;
   transferStatus?: 'pending' | 'accepted' | 'rejected';
@@ -269,6 +281,7 @@ export interface Message {
   };
   timestamp?: string;
   isRead?: boolean;
+  readBy?: string[];
   status?: 'sent' | 'delivered' | 'read';
   createdAt?: number;
   isRecalled?: boolean;
@@ -410,7 +423,16 @@ export interface CallRecord {
   duration: number; // in seconds
 }
 
-export type Screen = 'home' | 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'lovewidget' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera' | 'phone';
+export interface GroupChat {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  memberIds: string[]; // Persona IDs
+  ownerId: string; // User ID
+  createdAt: number;
+}
+
+export type Screen = 'home' | 'chat' | 'persona' | 'api' | 'theme' | 'music' | 'xhs' | 'wallet' | 'treehole' | 'taobao' | 'fooddelivery' | 'bartender' | 'aiphones' | 'lovewidget' | 'photoalbum' | 'weather' | 'calendar' | 'notes' | 'calculator' | 'camera' | 'phone' | 'virtualmap';
 
 
 

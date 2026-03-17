@@ -58,7 +58,8 @@ const ChatBubbleWrapper = React.memo(({
 import { LoveWidgetScreen } from './components/LoveWidgetScreen';
 import { PhotoAlbumScreen } from './components/PhotoAlbumScreen';
 import { WalletScreen } from './components/WalletScreen';
-import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry, Transaction, CallRecord } from './types';
+import { VirtualMapScreen } from './components/VirtualMapScreen';
+import { Screen, Persona, UserProfile, ApiSettings, ThemeSettings, Message, Moment, Song, WorldbookSettings, XHSPost, TreeHolePost, TreeHoleNotification, TreeHoleMessage, Order, Playlist, DiaryEntry, Transaction, CallRecord, GroupChat } from './types';
 import { AnimatePresence, motion } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
 import { storageService } from './services/storageService';
@@ -119,6 +120,7 @@ export default function App() {
   const [listenStartTime, setListenStartTime] = useState<number | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAiPhoneOpen, setIsAiPhoneOpen] = useState(false);
+  const [groups, setGroups] = useState<GroupChat[]>([]);
   
   // Music Player State
   const [songs, setSongs] = useState<Song[]>([]);
@@ -400,6 +402,7 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notification, setNotification] = useState<{title: string, body: string, personaId?: string} | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [followedAuthorIds, setFollowedAuthorIds] = useState<string[]>(['p1']);
   const [blockedAuthorIds, setBlockedAuthorIds] = useState<string[]>([]);
   const [xhsPrivateChats, setXhsPrivateChats] = useState<Record<string, { text: string, isMe: boolean, time: number, isSystem?: boolean }[]>>({
@@ -779,6 +782,7 @@ export default function App() {
           migrate('followedAuthorIds', setFollowedAuthorIds),
           migrate('blockedAuthorIds', setBlockedAuthorIds),
           migrate('orders', setOrders),
+          migrate('groups', setGroups),
         ]);
 
         // Handle theme separately to load font blob
@@ -843,6 +847,7 @@ export default function App() {
   useEffect(() => { debouncedSave('followedAuthorIds', followedAuthorIds); }, [followedAuthorIds, isReady]);
   useEffect(() => { debouncedSave('blockedAuthorIds', blockedAuthorIds); }, [blockedAuthorIds, isReady]);
   useEffect(() => { debouncedSave('orders', orders); }, [orders, isReady]);
+  useEffect(() => { debouncedSave('groups', groups); }, [groups, isReady]);
 
   const aiRef = useRef<GoogleGenAI | null>(null);
   const prevMessagesLength = useRef(messages.length);
@@ -1373,6 +1378,19 @@ export default function App() {
 
   const cleanContextMessage = (text: string) => {
     return text.replace(/\[STICKER:\s*data:[^\]]+\]/g, '[STICKER: image]');
+  };
+
+  const handleCreateGroup = (name: string, memberIds: string[]) => {
+    const newGroup: GroupChat = {
+      id: Date.now().toString(),
+      name,
+      memberIds: [...memberIds, 'user'], // Always include user
+      ownerId: 'user',
+      createdAt: Date.now()
+    };
+    setGroups(prev => [...prev, newGroup]);
+    setCurrentGroupId(newGroup.id);
+    setCurrentChatId(null);
   };
 
   const handleSendMessage = React.useCallback(async (text: string, personaId: string) => {
@@ -2483,6 +2501,24 @@ export default function App() {
                 </motion.div>
               )}
 
+              {currentScreen === 'virtualmap' && currentChatId && (
+                <motion.div
+                  key="virtualmap"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full h-full absolute inset-0 z-50 bg-[#0f172a]"
+                >
+                  <VirtualMapScreen 
+                    persona={personas.find(p => p.id === currentChatId)!}
+                    userProfile={userProfile}
+                    theme={theme}
+                    onBack={() => setCurrentScreen('chat')}
+                  />
+                </motion.div>
+              )}
+
               {currentScreen === 'phone' && (
                 <motion.div
                   key="phone"
@@ -2533,6 +2569,10 @@ export default function App() {
                     onAiOrder={handleAiOrder}
                     onStartListeningWith={handleStartListeningWith}
                     aiRef={aiRef}
+                    groups={groups}
+                    currentGroupId={currentGroupId}
+                    setCurrentGroupId={setCurrentGroupId}
+                    onCreateGroup={handleCreateGroup}
                     onNavigate={(screen, params) => {
                       setCurrentScreen(screen);
                       if (screen === 'music' && params?.personaId) {
