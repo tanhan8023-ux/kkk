@@ -28,9 +28,10 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
 
   return (
     <div className={`font-sans overflow-hidden ${theme.immersiveMode ? 'fixed inset-0 w-full h-full' : 'h-full flex items-center justify-center sm:bg-neutral-900 sm:p-4'}`} style={{ scrollbarGutter: 'stable' }}>
-      {theme.fontUrl && (
+      {(theme.fontUrl || theme.globalCss) && (
         <style>
           {`
+            ${theme.fontUrl ? `
             @font-face {
               font-family: 'CustomThemeFont';
               src: url('${theme.fontUrl}');
@@ -38,6 +39,8 @@ export function Phone({ children, onHomeClick, theme, hideHomeIndicator }: { chi
             .theme-font {
               font-family: 'CustomThemeFont', sans-serif !important;
             }
+            ` : ''}
+            ${theme.globalCss || ''}
           `}
         </style>
       )}

@@ -37,6 +37,15 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
   const notificationSoundInputRef = useRef<HTMLInputElement>(null);
   const [activeIconId, setActiveIconId] = React.useState<string | null>(null);
   const [showExitConfirm, setShowExitConfirm] = React.useState(false);
+  const [jsonCode, setJsonCode] = React.useState(JSON.stringify(initialTheme, null, 2));
+  const [jsonError, setJsonError] = React.useState<string | null>(null);
+  const [showCodeEditor, setShowCodeEditor] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!showCodeEditor) {
+      setJsonCode(JSON.stringify(theme, null, 2));
+    }
+  }, [theme, showCodeEditor]);
 
   const hasChanges = JSON.stringify(theme) !== JSON.stringify(initialTheme);
 
@@ -156,6 +165,17 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setThemeState({ ...theme, iconBgColor: e.target.value });
+  };
+
+  const handleApplyJson = () => {
+    try {
+      const parsed = JSON.parse(jsonCode);
+      setThemeState(parsed);
+      setJsonError(null);
+      alert('代码已应用！请记得点击保存。');
+    } catch (e: any) {
+      setJsonError(e.message);
+    }
   };
 
   return (
@@ -800,6 +820,83 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             <p className="text-[10px] text-neutral-400 px-1">
               * 开启全屏会自动进入沉浸模式，移除手机边框。
             </p>
+          </div>
+        </div>
+
+        {/* Global Custom CSS */}
+        <div className="space-y-3">
+          <label className="text-[13px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-2">
+            <Palette size={14} /> 全局自定义 CSS
+          </label>
+          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm space-y-2">
+            <textarea
+              value={theme.globalCss || ''}
+              onChange={(e) => setThemeState({ ...theme, globalCss: e.target.value })}
+              placeholder="例如: .app-icon { border-radius: 50%; } body { filter: grayscale(0.2); }"
+              className="w-full h-32 p-3 text-xs font-mono border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-blue-500 bg-neutral-50"
+            />
+            <p className="text-[10px] text-neutral-400">
+              * 此 CSS 将直接注入应用全局样式，可用于深度美化。
+            </p>
+          </div>
+        </div>
+
+        {/* Advanced Code Editor */}
+        <div className="space-y-3">
+          <label className="text-[13px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-2">
+            <Download size={14} /> 高级代码自定义 (JSON)
+          </label>
+          <div className="bg-white border border-neutral-200 rounded-xl p-1 shadow-sm overflow-hidden">
+            <button 
+              onClick={() => setShowCodeEditor(!showCodeEditor)}
+              className="w-full flex items-center justify-between p-3 active:bg-neutral-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500">
+                  <Type size={18} />
+                </div>
+                <span className="text-[15px] text-neutral-700">{showCodeEditor ? '隐藏代码编辑器' : '打开代码编辑器'}</span>
+              </div>
+              <span className="text-neutral-400 text-xs">{showCodeEditor ? '收起' : '展开'}</span>
+            </button>
+            
+            {showCodeEditor && (
+              <div className="p-3 border-t border-neutral-100 space-y-3">
+                <div className="relative">
+                  <textarea
+                    value={jsonCode}
+                    onChange={(e) => {
+                      setJsonCode(e.target.value);
+                      setJsonError(null);
+                    }}
+                    spellCheck={false}
+                    className={`w-full h-64 p-3 text-xs font-mono border ${jsonError ? 'border-red-500' : 'border-neutral-200'} rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-neutral-900 text-green-400`}
+                  />
+                  {jsonError && (
+                    <div className="absolute bottom-2 left-2 right-2 p-2 bg-red-500/90 text-white text-[10px] rounded-lg">
+                      格式错误: {jsonError}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handleApplyJson}
+                    className="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium active:bg-blue-600 transition-colors"
+                  >
+                    应用代码
+                  </button>
+                  <button 
+                    onClick={() => setJsonCode(JSON.stringify(theme, null, 2))}
+                    className="px-4 py-2 bg-neutral-100 text-neutral-600 rounded-lg text-sm font-medium active:bg-neutral-200"
+                  >
+                    重置
+                  </button>
+                </div>
+                <p className="text-[10px] text-neutral-400">
+                  * 直接编辑 JSON 配置。请确保格式正确，否则可能导致应用异常。
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

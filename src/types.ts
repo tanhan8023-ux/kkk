@@ -201,6 +201,7 @@ export interface ThemeSettings {
   innerVoiceCss?: string;
   innerVoiceBgColor?: string;
   innerVoiceTextColor?: string;
+  globalCss?: string;
   layout?: HomeScreenLayout;
 }
 
