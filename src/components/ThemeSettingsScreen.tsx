@@ -19,6 +19,22 @@ const DEFAULT_SOUNDS = [
   { name: '鸟鸣', url: 'https://assets.mixkit.co/active_storage/sfx/2359/2359-preview.mp3' },
 ];
 
+const DEFAULT_THEME: ThemeSettings = {
+  wallpaper: '',
+  lockScreenWallpaper: '',
+  momentsBg: '',
+  iconBgColor: 'rgba(255, 255, 255, 0.9)',
+  fontUrl: '',
+  timeColor: '#ffffff',
+  statusColor: '#ffffff',
+  customIcons: {},
+  musicPlayer: {
+    title: '想变成你的随身听...',
+    avatar1: 'https://picsum.photos/seed/avatar1/100/100',
+    avatar2: 'https://picsum.photos/seed/avatar2/100/100'
+  }
+};
+
 export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExport, onImport }: Props) {
   const [theme, setThemeState] = React.useState<ThemeSettings>(initialTheme);
   const [isReadingFile, setIsReadingFile] = React.useState(false);
@@ -334,9 +350,19 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
 
           {/* Chat Background */}
           <div className="space-y-3 col-span-2 border-t border-neutral-200 pt-4 mt-2">
-            <label className="text-[11px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-1.5">
-              <ImageIcon size={12} /> 聊天背景图
-            </label>
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-1.5">
+                <ImageIcon size={12} /> 聊天背景图
+              </label>
+              {theme.chatBg && (
+                <button 
+                  onClick={() => setThemeState(prev => ({ ...prev, chatBg: undefined }))}
+                  className="text-[10px] text-red-500 font-medium active:opacity-70"
+                >
+                  恢复默认
+                </button>
+              )}
+            </div>
             <div 
               className="w-full h-32 bg-white border border-neutral-200 rounded-xl flex items-center justify-center cursor-pointer overflow-hidden relative shadow-sm"
               onClick={() => chatBgInputRef.current?.click()}
@@ -356,9 +382,19 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
           {/* Chat Bubbles */}
           <div className="grid grid-cols-2 gap-4 col-span-2 border-t border-neutral-200 pt-4 mt-2">
             <div className="space-y-3 min-w-0">
-              <label className="text-[11px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-1.5">
-                <MessageCircle size={12} /> 我的气泡背景图
-              </label>
+              <div className="flex items-center justify-between px-1">
+                <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <MessageCircle size={12} /> 我的气泡背景图
+                </label>
+                {theme.chatBubbleUser && (
+                  <button 
+                    onClick={() => setThemeState(prev => ({ ...prev, chatBubbleUser: undefined }))}
+                    className="text-[10px] text-red-500 font-medium active:opacity-70"
+                  >
+                    恢复默认
+                  </button>
+                )}
+              </div>
               <div 
                 className="w-full h-24 bg-white border border-neutral-200 rounded-xl flex items-center justify-center cursor-pointer overflow-hidden relative shadow-sm"
                 onClick={() => chatBubbleUserInputRef.current?.click()}
@@ -373,9 +409,19 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
                 type="file" accept="image/*" className="hidden" ref={chatBubbleUserInputRef}
                 onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, chatBubbleUser: url }))}
               />
-              <label className="text-[11px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-1.5 mt-2">
-                我的气泡 CSS
-              </label>
+              <div className="flex items-center justify-between px-1 mt-2">
+                <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-1.5">
+                  我的气泡 CSS
+                </label>
+                {theme.chatBubbleUserCss && (
+                  <button 
+                    onClick={() => setThemeState(prev => ({ ...prev, chatBubbleUserCss: undefined }))}
+                    className="text-[10px] text-red-500 font-medium active:opacity-70"
+                  >
+                    恢复默认
+                  </button>
+                )}
+              </div>
               <textarea
                 value={theme.chatBubbleUserCss || ''}
                 onChange={(e) => setThemeState({ ...theme, chatBubbleUserCss: e.target.value })}
@@ -385,9 +431,19 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
 
             <div className="space-y-3 min-w-0">
-              <label className="text-[11px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-1.5">
-                <MessageCircle size={12} /> 对方气泡背景图
-              </label>
+              <div className="flex items-center justify-between px-1">
+                <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <MessageCircle size={12} /> 对方气泡背景图
+                </label>
+                {theme.chatBubbleAi && (
+                  <button 
+                    onClick={() => setThemeState(prev => ({ ...prev, chatBubbleAi: undefined }))}
+                    className="text-[10px] text-red-500 font-medium active:opacity-70"
+                  >
+                    恢复默认
+                  </button>
+                )}
+              </div>
               <div 
                 className="w-full h-24 bg-white border border-neutral-200 rounded-xl flex items-center justify-center cursor-pointer overflow-hidden relative shadow-sm"
                 onClick={() => chatBubbleAiInputRef.current?.click()}
@@ -402,9 +458,19 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
                 type="file" accept="image/*" className="hidden" ref={chatBubbleAiInputRef}
                 onChange={(e) => handleImageUpload(e, (url) => setThemeState({ ...theme, chatBubbleAi: url }))}
               />
-              <label className="text-[11px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-1.5 mt-2">
-                对方气泡 CSS
-              </label>
+              <div className="flex items-center justify-between px-1 mt-2">
+                <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide flex items-center gap-1.5">
+                  对方气泡 CSS
+                </label>
+                {theme.chatBubbleAiCss && (
+                  <button 
+                    onClick={() => setThemeState(prev => ({ ...prev, chatBubbleAiCss: undefined }))}
+                    className="text-[10px] text-red-500 font-medium active:opacity-70"
+                  >
+                    恢复默认
+                  </button>
+                )}
+              </div>
               <textarea
                 value={theme.chatBubbleAiCss || ''}
                 onChange={(e) => setThemeState({ ...theme, chatBubbleAiCss: e.target.value })}
@@ -531,7 +597,17 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
             </div>
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-neutral-400 ml-1">自定义 CSS</span>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs text-neutral-400">自定义 CSS</span>
+              {theme.innerVoiceCss && (
+                <button 
+                  onClick={() => setThemeState(prev => ({ ...prev, innerVoiceCss: undefined }))}
+                  className="text-[10px] text-red-500 font-medium active:opacity-70"
+                >
+                  恢复默认
+                </button>
+              )}
+            </div>
             <textarea
               value={theme.innerVoiceCss || ''}
               onChange={(e) => setThemeState({ ...theme, innerVoiceCss: e.target.value })}
@@ -714,53 +790,6 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
           </div>
         </div>
 
-        {/* Inner Voice Styling */}
-        <div className="space-y-3">
-          <label className="text-[13px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-2">
-            <MessageCircle size={14} /> 心声美化
-          </label>
-          <div className="bg-white border border-neutral-200 rounded-xl p-4 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] text-neutral-700">心声背景颜色</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-400 font-mono uppercase">{theme.innerVoiceBgColor || '#f3f4f6'}</span>
-                <input 
-                  type="color" 
-                  value={theme.innerVoiceBgColor || '#f3f4f6'}
-                  onChange={(e) => setThemeState({ ...theme, innerVoiceBgColor: e.target.value })}
-                  className="w-8 h-8 rounded-full border-0 p-0 cursor-pointer overflow-hidden"
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between border-t border-neutral-100 pt-4">
-              <span className="text-[15px] text-neutral-700">心声文字颜色</span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-neutral-400 font-mono uppercase">{theme.innerVoiceTextColor || '#6b7280'}</span>
-                <input 
-                  type="color" 
-                  value={theme.innerVoiceTextColor || '#6b7280'}
-                  onChange={(e) => setThemeState({ ...theme, innerVoiceTextColor: e.target.value })}
-                  className="w-8 h-8 rounded-full border-0 p-0 cursor-pointer overflow-hidden"
-                />
-              </div>
-            </div>
-            <div className="space-y-2 border-t border-neutral-100 pt-4">
-              <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wide">
-                心声自定义 CSS
-              </label>
-              <textarea
-                value={theme.innerVoiceCss || ''}
-                onChange={(e) => setThemeState({ ...theme, innerVoiceCss: e.target.value })}
-                placeholder="例如: border: 1px dashed #ccc; font-style: italic;"
-                className="w-full h-24 p-3 text-xs border border-neutral-200 rounded-xl resize-none focus:outline-none focus:border-blue-500 bg-neutral-50"
-              />
-              <p className="text-[10px] text-neutral-400">
-                * 样式将作用于心声气泡容器。
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Display Settings */}
         <div className="space-y-3">
           <label className="text-[13px] font-medium text-neutral-500 ml-1 uppercase tracking-wide flex items-center gap-2">
@@ -935,6 +964,23 @@ export function ThemeSettingsScreen({ theme: initialTheme, onSave, onBack, onExp
                 onChange={handleImportTheme}
               />
             </label>
+            <div className="h-[1px] bg-neutral-100 mx-3"></div>
+            <button 
+              onClick={() => {
+                if (window.confirm('确定要恢复出厂设置吗？所有主题自定义项都将被重置。')) {
+                  setThemeState(DEFAULT_THEME);
+                }
+              }}
+              className="w-full flex items-center justify-between p-3 active:bg-neutral-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
+                  <Palette size={18} />
+                </div>
+                <span className="text-[15px] text-neutral-700 font-medium">恢复出厂设置</span>
+              </div>
+              <span className="text-neutral-400 text-xs text-red-400">重置</span>
+            </button>
           </div>
         </div>
 
