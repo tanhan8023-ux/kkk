@@ -153,10 +153,10 @@ export async function generateImage(prompt: string, providedApiKey: string): Pro
       });
       englishPrompt = response.text?.trim() || prompt;
     } catch (e: any) {
-      console.warn("Translation with gemini-3-flash-preview failed, trying gemini-3.1-flash-lite-preview.");
+      console.warn("Translation with gemini-3-flash-preview failed, trying gemini-flash-latest.");
       try {
         const fallbackResponse = await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite-preview",
+          model: "gemini-flash-latest",
           contents: `Translate the following image description to a concise English prompt for an AI image generator. Only output the English prompt, nothing else.\n\nDescription: ${prompt}`,
           config: {
             temperature: 0.7,
@@ -516,9 +516,9 @@ ${(persona.prompts || []).join('\n')}
         }
       });
     } catch (e: any) {
-      console.warn(`generateMoment with ${model} failed, trying fallback gemini-3.1-flash-lite-preview:`, e);
+      console.warn(`generateMoment with ${model} failed, trying fallback gemini-flash-latest:`, e);
       response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-flash-latest",
         contents: prompt,
         config: {
           temperature: 0.9,
@@ -919,7 +919,7 @@ export async function fetchAiResponse(
         if (res.status === 429 || errorMessage.includes("limit") || errorMessage.includes("quota")) {
           retries++;
           if (currentModel.includes("pro")) {
-            currentModel = "gemini-3.1-flash-lite-preview"; // 降级到更轻量的模型
+            currentModel = "gemini-flash-latest"; // 降级到更轻量的模型
           }
           await new Promise(resolve => setTimeout(resolve, 5000 * retries)); // 指数退避
           continue;

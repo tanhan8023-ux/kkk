@@ -462,13 +462,18 @@ export function MusicScreen({
         
         const scrollPos = elementTop - (containerHeight / 2) + (elementHeight / 2);
         
+        // Use 'auto' behavior if the scroll distance is large (e.g. after a seek)
+        // to avoid long smooth scroll animations
+        const currentScroll = container.scrollTop;
+        const distance = Math.abs(currentScroll - scrollPos);
+        
         container.scrollTo({
           top: scrollPos,
-          behavior: 'smooth'
+          behavior: distance > 200 ? 'auto' : 'smooth'
         });
       }
     }
-  }, [activeLyricIndex, showLyrics]);
+  }, [activeLyricIndex, showLyrics, parsedLyrics.length]);
 
   const formatTime = (time: number) => {
     if (isNaN(time)) return '0:00';
@@ -1146,9 +1151,6 @@ export function MusicScreen({
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShowPlaylistSelectorForSong(currentSong.id)} className="p-2.5 text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-full">
                     <FolderPlus className="w-5 h-5" />
-                  </button>
-                  <button onClick={handleShare} className="p-2.5 text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-full">
-                    <Share className="w-5 h-5" />
                   </button>
                 </div>
               </div>
