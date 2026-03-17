@@ -1095,6 +1095,6 @@ export async function fetchAiResponse(
 
 // Strip [ID: xxx] patterns and ||| separators
 export function processAiResponse(responseText: string) {
-  return responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').replace(/\|\|\|/g, '').trim();
+  return responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').replace(/\|\|\|/g, '');
 }
 
