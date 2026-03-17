@@ -283,17 +283,38 @@ export function ChatScreen({
         return;
       }
       
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        personaId: persona.id,
-        role: 'model',
-        text: text,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        isRead: true, // Auto-read since user is looking at it?
-        createdAt: Date.now()
-      };
+      const finalParts: string[] = [];
+      if (persona.isSegmentResponse) {
+        const segments = text.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
+        for (let i = 0; i < segments.length; i++) {
+          if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
+            finalParts[finalParts.length - 1] += segments[i];
+          } else {
+            finalParts.push(segments[i].trim());
+          }
+        }
+      } else {
+        finalParts.push(text);
+      }
 
-      setMessages(prev => [...prev, newMessage]);
+      for (let i = 0; i < finalParts.length; i++) {
+        const partText = finalParts[i];
+        const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
+        setIsTyping(true);
+        await new Promise(resolve => setTimeout(resolve, typingDelay));
+        
+        const newMessage: Message = {
+          id: (Date.now() + Math.random()).toString(),
+          personaId: persona.id,
+          role: 'model',
+          text: partText,
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+          isRead: true, // Auto-read since user is looking at it?
+          createdAt: Date.now()
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
+
       setUnreadPesterCount(prev => prev + 1);
 
     } catch (error: any) {
@@ -1281,18 +1302,39 @@ export function ChatScreen({
                   const aiResponse = await fetchAiResponse(recallPrompt, recallContext, currentPersona, apiSettings, worldbook, userProfile, aiRef);
                   const cleanedRecallResponse = aiResponse.responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').trim();
                   
-                  const newAiMsg: Message = { 
-                    id: (Date.now() + 2).toString(), 
-                    personaId: currentPersona.id,
-                    role: 'model', 
-                    text: cleanedRecallResponse,
-                    msgType: 'text',
-                    timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-                    isRead: true,
-                    createdAt: Date.now(),
-                    theaterId
-                  };
-                  setMessages(prev => [...prev, newAiMsg]);
+                  const finalParts: string[] = [];
+                  if (currentPersona.isSegmentResponse) {
+                    const segments = cleanedRecallResponse.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
+                    for (let i = 0; i < segments.length; i++) {
+                      if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
+                        finalParts[finalParts.length - 1] += segments[i];
+                      } else {
+                        finalParts.push(segments[i].trim());
+                      }
+                    }
+                  } else {
+                    finalParts.push(cleanedRecallResponse);
+                  }
+
+                  for (let i = 0; i < finalParts.length; i++) {
+                    const partText = finalParts[i];
+                    const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
+                    setIsTyping(true);
+                    await new Promise(resolve => setTimeout(resolve, typingDelay));
+                    
+                    const newAiMsg: Message = { 
+                      id: (Date.now() + Math.random()).toString(), 
+                      personaId: currentPersona.id,
+                      role: 'model', 
+                      text: partText,
+                      msgType: 'text',
+                      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                      isRead: true,
+                      createdAt: Date.now(),
+                      theaterId
+                    };
+                    setMessages(prev => [...prev, newAiMsg]);
+                  }
                 } catch (e) {
                   console.error("AI recall error:", e);
                 } finally {
@@ -1521,20 +1563,38 @@ export function ChatScreen({
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
-        const typingDelay = Math.min(aiResponse.responseText.length * 100, 3000) + Math.random() * 1000;
-        await new Promise(resolve => setTimeout(resolve, typingDelay));
-        
-        const aiMsg: Message = { 
-          id: (Date.now() + 1).toString(), 
-          personaId: currentPersona.id,
-          role: 'model', 
-          text: aiResponse.responseText,
-          msgType: 'text',
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          isRead: true,
-          createdAt: Date.now()
-        };
-        setMessages(prev => [...prev, aiMsg]);
+        const finalParts: string[] = [];
+        if (currentPersona.isSegmentResponse) {
+          const segments = aiResponse.responseText.split(/([。！？\n!?]+)/).filter((s: string) => s.trim().length > 0);
+          for (let i = 0; i < segments.length; i++) {
+            if (i > 0 && segments[i].match(/^[。！？\n!?]+$/)) {
+              finalParts[finalParts.length - 1] += segments[i];
+            } else {
+              finalParts.push(segments[i].trim());
+            }
+          }
+        } else {
+          finalParts.push(aiResponse.responseText);
+        }
+
+        for (let i = 0; i < finalParts.length; i++) {
+          const partText = finalParts[i];
+          const typingDelay = Math.min(partText.length * 50, 1500) + Math.random() * 500;
+          setIsTyping(true);
+          await new Promise(resolve => setTimeout(resolve, typingDelay));
+          
+          const aiMsg: Message = { 
+            id: (Date.now() + Math.random()).toString(), 
+            personaId: currentPersona.id,
+            role: 'model', 
+            text: partText,
+            msgType: 'text',
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            isRead: true,
+            createdAt: Date.now()
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        }
       } catch (e) {
         console.error("AI pat response error:", e);
       } finally {

@@ -271,27 +271,6 @@ export default function App() {
             localforage.setItem('local_songs_metadata', metadata);
           }
         });
-
-        // If title or artist changed, re-fetch lyrics
-        if (updates.title !== undefined || updates.artist !== undefined) {
-           lyricService.extractLyrics(updatedSong.title, updatedSong.artist, apiSettings, worldbook, userProfile, aiRef)
-             .then(lyrics => {
-               setSongs(currentSongs => {
-                 const newSongs = currentSongs.map(s => s.id === songId ? { ...s, lyrics } : s);
-                 
-                 // Update storage again with new lyrics
-                 storageService.getAllMetadata().then(metadata => {
-                    const idx = metadata.findIndex(m => m.id === songId);
-                    if (idx >= 0) {
-                      metadata[idx] = { ...metadata[idx], lyrics };
-                      localforage.setItem('local_songs_metadata', metadata);
-                    }
-                 });
-                 return newSongs;
-               });
-             })
-             .catch(e => console.error("Failed to re-fetch lyrics:", e));
-        }
       }
       return updatedSongs;
     });

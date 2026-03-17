@@ -3,10 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronDown, Play, Pause, SkipBack, SkipForward, 
   ListMusic, Plus, Share, MoreHorizontal, Music, Trash2, FolderPlus, Folder, Users, X, Heart,
-  Minimize2, Maximize2, Image as ImageIcon, Upload, Edit2
+  Minimize2, Maximize2, Image as ImageIcon, Upload, Edit2, Repeat1, MessageCircle
 } from 'lucide-react';
 import { Song, Persona, Playlist, Message, ApiSettings, WorldbookSettings, UserProfile, ThemeSettings } from '../types';
-import { fetchAiResponse, generateLyrics } from '../services/aiService';
+import { fetchAiResponse, generateLyrics, transcribeAudio } from '../services/aiService';
 import { GoogleGenAI } from '@google/genai';
 import * as mm from 'music-metadata-browser';
 
@@ -92,10 +92,51 @@ export function MusicScreen({
   const [isCommentaryLoading, setIsCommentaryLoading] = useState(false);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   
+  const [isSelectingLyrics, setIsSelectingLyrics] = useState(false);
+  const [selectedLyricIndices, setSelectedLyricIndices] = useState<number[]>([]);
+  const [pendingShareLyrics, setPendingShareLyrics] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lyricsContainerRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const lyricsFileInputRef = useRef<HTMLInputElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  
+  const handleUploadAudioForLyrics = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !apiSettings || !aiRef) return;
+
+    setIsCommentaryLoading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64 = e.target?.result as string;
+          const mimeType = file.type;
+          const lyrics = await transcribeAudio(base64.split(',')[1], mimeType, apiSettings, aiRef);
+          if (onUpdateSong && currentSong) {
+            onUpdateSong(currentSong.id, { lyrics });
+          }
+        } catch (err) {
+          console.error("Failed to transcribe audio inside reader:", err);
+          alert("提取歌词失败，请检查 API 密钥或网络连接。");
+        } finally {
+          setIsCommentaryLoading(false);
+          if (lyricsFileInputRef.current) {
+            lyricsFileInputRef.current.value = '';
+          }
+        }
+      };
+      reader.onerror = () => {
+        console.error("Failed to read file");
+        setIsCommentaryLoading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to transcribe audio:", error);
+      setIsCommentaryLoading(false);
+    }
+  };
 
   const currentSong = songs[currentSongIndex];
   const listeningWith = listeningWithPersonaId ? personas.find(p => p.id === listeningWithPersonaId) : null;
@@ -354,6 +395,9 @@ export function MusicScreen({
   useEffect(() => {
     setLyricOffset(0); // Reset offset when song changes
     setEditedLyrics(currentSong?.lyrics || '');
+  }, [currentSong?.id, currentSong?.lyrics]);
+
+  useEffect(() => {
     if (currentSong?.lyrics) {
       const parsed = currentSong.lyrics.split('\n').map(line => {
         const match = line.match(/\[(\d+):(\d+(\.\d+)?)\](.*)/);
@@ -366,11 +410,28 @@ export function MusicScreen({
         }
         return null;
       }).filter((item): item is {time: number, text: string} => item !== null && item.text !== '');
-      setParsedLyrics(parsed.sort((a, b) => a.time - b.time));
+      
+      if (parsed.length > 0) {
+        setParsedLyrics(parsed.sort((a, b) => a.time - b.time));
+      } else if (duration > 0) {
+        // Fallback for plain text lyrics: approximate scrolling
+        const lines = currentSong.lyrics.split('\n').map(l => l.trim()).filter(l => l !== '');
+        const startTime = duration * 0.1; // Start scrolling at 10% of the song
+        const endTime = duration * 0.9;   // End scrolling at 90% of the song
+        const timePerLine = (endTime - startTime) / Math.max(lines.length, 1);
+        
+        const fakeParsed = lines.map((text, i) => ({
+          time: startTime + i * timePerLine,
+          text
+        }));
+        setParsedLyrics(fakeParsed);
+      } else {
+        setParsedLyrics([]);
+      }
     } else {
       setParsedLyrics([]);
     }
-  }, [currentSong?.id, currentSong?.lyrics]);
+  }, [currentSong?.id, currentSong?.lyrics, duration]);
 
   // Update active lyric index
   useEffect(() => {
@@ -867,14 +928,31 @@ export function MusicScreen({
                                 </button>
                               )}
                               
-                              {!isEditingLyrics && listeningWith && onShareLyricsToChat && currentSong?.lyrics && (
-                                <button 
-                                  onClick={() => onShareLyricsToChat(currentSong.title, currentSong.lyrics || '', listeningWith.id)} 
-                                  className="px-3 py-1 hover:bg-white/10 rounded-full text-indigo-300 text-xs font-medium"
+                              {!isEditingLyrics && (
+                                <button
+                                  onClick={() => lyricsFileInputRef.current?.click()}
+                                  className="px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 rounded-full text-purple-400 text-xs font-medium flex items-center gap-1"
+                                  title="上传音频文件提取歌词"
+                                  disabled={isCommentaryLoading}
                                 >
-                                  分享
+                                  {isCommentaryLoading ? (
+                                    <span className="animate-pulse">提取中...</span>
+                                  ) : (
+                                    <>
+                                      <Upload size={12} />
+                                      <span>MP3提取</span>
+                                    </>
+                                  )}
                                 </button>
                               )}
+                              
+                              <input
+                                type="file"
+                                ref={lyricsFileInputRef}
+                                onChange={handleUploadAudioForLyrics}
+                                accept="audio/*"
+                                className="hidden"
+                              />
                             </div>
 
                             {isEditingLyrics && (
@@ -904,16 +982,100 @@ export function MusicScreen({
                           ) : parsedLyrics.length > 0 ? (
                             parsedLyrics.map((line, i) => {
                               const isActive = i === activeLyricIndex;
+                              const isSelected = selectedLyricIndices.includes(i);
                               return (
-                                <p 
-                                  key={i} 
-                                  className={`text-sm mb-6 transition-all duration-500 ${isActive ? 'text-white font-bold scale-125 active-lyric' : 'text-white/20'}`}
-                                >
-                                  {line.text}
-                                </p>
+                                <div key={i} className={`mb-6 flex justify-center ${isActive ? 'active-lyric' : ''}`}>
+                                  <div className="relative inline-flex items-center">
+                                    <p 
+                                      onClick={() => {
+                                        if (isSelectingLyrics) {
+                                          setSelectedLyricIndices(prev => 
+                                            prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]
+                                          );
+                                        } else {
+                                          onSeek(line.time);
+                                        }
+                                      }}
+                                      className={`text-sm transition-all duration-300 cursor-pointer ${
+                                        isSelectingLyrics 
+                                          ? (isSelected ? 'text-white font-bold scale-110 bg-white/20 rounded-lg py-2 px-4 inline-block' : 'text-white/40 hover:text-white/60')
+                                          : (isActive ? 'text-white font-bold scale-125' : 'text-white/20 hover:text-white/40')
+                                      }`}
+                                    >
+                                      {line.text}
+                                    </p>
+                                    {!isSelectingLyrics && isActive && onShareLyricsToChat && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (listeningWith) {
+                                            onShareLyricsToChat(currentSong.title, line.text, listeningWith.id);
+                                          } else {
+                                            setPendingShareLyrics(line.text);
+                                            setShowPersonaSelector(true);
+                                          }
+                                        }}
+                                        className="absolute left-full ml-2 p-1.5 text-white/40 hover:text-white transition-colors rounded-full hover:bg-white/10"
+                                        title="分享这句歌词"
+                                      >
+                                        <Share className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               );
                             })
+                          ) : currentSong?.lyrics ? (
+                            <div className="text-white/80 text-sm whitespace-pre-wrap text-center leading-loose pb-8">
+                              {currentSong.lyrics}
+                            </div>
                           ) : <p className="text-white/40 italic text-sm">暂无歌词</p>}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Lyrics Selection Floating Action Bar */}
+                  <AnimatePresence>
+                    {isSelectingLyrics && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="absolute bottom-4 left-0 right-0 flex justify-center z-50 pointer-events-none"
+                      >
+                        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-full p-2 flex items-center gap-2 pointer-events-auto shadow-2xl">
+                          <button
+                            onClick={() => {
+                              setIsSelectingLyrics(false);
+                              setSelectedLyricIndices([]);
+                            }}
+                            className="px-4 py-2 rounded-full text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                          >
+                            取消
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (selectedLyricIndices.length === 0) return;
+                              const selectedText = selectedLyricIndices.sort((a, b) => a - b).map(i => parsedLyrics[i].text).join('\n');
+                              if (listeningWith && onShareLyricsToChat) {
+                                onShareLyricsToChat(currentSong.title, selectedText, listeningWith.id);
+                                setIsSelectingLyrics(false);
+                                setSelectedLyricIndices([]);
+                              } else {
+                                setPendingShareLyrics(selectedText);
+                                setShowPersonaSelector(true);
+                              }
+                            }}
+                            disabled={selectedLyricIndices.length === 0}
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
+                              selectedLyricIndices.length > 0 
+                                ? 'bg-white text-black hover:scale-105 shadow-lg shadow-white/20' 
+                                : 'bg-white/20 text-white/40 cursor-not-allowed'
+                            }`}
+                          >
+                            分享给 AI {selectedLyricIndices.length > 0 ? `(${selectedLyricIndices.length}句)` : ''}
+                          </button>
                         </div>
                       </motion.div>
                     )}
@@ -924,10 +1086,10 @@ export function MusicScreen({
 
             </div>
 
-            {/* Music Card (Light Glassy Style) - Fixed at bottom */}
-            <div className="w-full bg-white/95 backdrop-blur-3xl rounded-[32px] p-5 shadow-[0_30px_60px_rgba(0,0,0,0.3)] border border-white/20 shrink-0 relative z-30">
+            {/* Music Card (Immersive Dark/Glassy Style) - Fixed at bottom */}
+            <div className="w-full bg-black/40 backdrop-blur-3xl rounded-t-[40px] p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.3)] border-t border-white/10 shrink-0 relative z-30">
               {/* Song Info */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex-1 min-w-0 pr-4">
                   {isEditingMetadata ? (
                     <div className="flex flex-col gap-2">
@@ -935,36 +1097,36 @@ export function MusicScreen({
                         type="text" 
                         value={editedTitle} 
                         onChange={e => setEditedTitle(e.target.value)} 
-                        className="text-lg font-bold text-neutral-900 leading-tight bg-neutral-100 rounded px-2 py-1 outline-none"
+                        className="text-xl font-bold text-white leading-tight bg-white/10 rounded px-3 py-2 outline-none border border-white/20"
                         placeholder="歌曲名"
                       />
                       <input 
                         type="text" 
                         value={editedArtist} 
                         onChange={e => setEditedArtist(e.target.value)} 
-                        className="text-sm text-neutral-500 font-medium mt-0.5 bg-neutral-100 rounded px-2 py-1 outline-none"
+                        className="text-base text-white/70 font-medium mt-1 bg-white/10 rounded px-3 py-2 outline-none border border-white/20"
                         placeholder="歌手名"
                       />
                       <textarea 
                         value={editedLyrics} 
                         onChange={e => setEditedLyrics(e.target.value)} 
-                        className="text-xs text-neutral-600 font-mono mt-2 bg-neutral-100 rounded px-2 py-1 outline-none h-32 resize-none"
+                        className="text-sm text-white/80 font-mono mt-2 bg-white/10 rounded px-3 py-2 outline-none border border-white/20 h-32 resize-none"
                         placeholder="在此处手动粘贴或编辑 LRC 歌词"
                       />
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-2">
                         <button onClick={() => {
                           if (onUpdateSong) {
                             onUpdateSong(currentSong.id, { title: editedTitle, artist: editedArtist, lyrics: editedLyrics });
                           }
                           setIsEditingMetadata(false);
-                        }} className="text-xs bg-indigo-500 text-white px-3 py-1.5 rounded-full font-medium">保存</button>
-                        <button onClick={() => setIsEditingMetadata(false)} className="text-xs bg-neutral-200 text-neutral-700 px-3 py-1.5 rounded-full font-medium">取消</button>
+                        }} className="text-sm bg-white text-black px-4 py-2 rounded-full font-bold">保存</button>
+                        <button onClick={() => setIsEditingMetadata(false)} className="text-sm bg-white/20 text-white px-4 py-2 rounded-full font-bold">取消</button>
                       </div>
                     </div>
                   ) : (
                     <div className="group relative pr-6">
-                      <h2 className="text-lg font-bold text-neutral-900 truncate leading-tight">{currentSong.title}</h2>
-                      <p className="text-sm text-neutral-500 font-medium truncate mt-0.5">{currentSong.artist}</p>
+                      <h2 className="text-2xl font-bold text-white truncate leading-tight tracking-tight">{currentSong.title}</h2>
+                      <p className="text-base text-white/60 font-medium truncate mt-1">{currentSong.artist}</p>
                       {currentSong.source === 'local' && (
                         <button 
                           onClick={() => {
@@ -973,74 +1135,82 @@ export function MusicScreen({
                             setEditedLyrics(currentSong.lyrics);
                             setIsEditingMetadata(true);
                           }}
-                          className="absolute top-1 right-0 p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-neutral-100 rounded-full"
+                          className="absolute top-1 right-0 p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white/10 hover:bg-white/20 rounded-full"
                         >
-                          <Edit2 className="w-3 h-3 text-neutral-500" />
+                          <Edit2 className="w-4 h-4 text-white/80" />
                         </button>
                       )}
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setShowPlaylistSelectorForSong(currentSong.id)} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors bg-neutral-100 rounded-full">
-                    <FolderPlus className="w-4 h-4" />
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShowPlaylistSelectorForSong(currentSong.id)} className="p-2.5 text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-full">
+                    <FolderPlus className="w-5 h-5" />
                   </button>
-                  <button onClick={handleShare} className="p-2 text-neutral-400 hover:text-neutral-900 transition-colors bg-neutral-100 rounded-full">
-                    <Share className="w-4 h-4" />
+                  <button onClick={handleShare} className="p-2.5 text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-full">
+                    <Share className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="w-full mb-4">
-                <div 
-                  className="h-1.5 w-full bg-neutral-200 rounded-full cursor-pointer relative overflow-hidden"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    onSeek(((e.clientX - rect.left) / rect.width) * duration);
-                  }}
-                >
-                  <motion.div 
-                    className="h-full bg-neutral-900 rounded-full"
-                    style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+              {/* Progress Bar (Draggable) */}
+              <div className="w-full mb-6">
+                <div className="relative w-full h-6 flex items-center group">
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    value={currentTime}
+                    onChange={(e) => onSeek(Number(e.target.value))}
+                    className="absolute z-20 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative z-0">
+                    <div 
+                      className="absolute top-0 left-0 h-full bg-white rounded-full pointer-events-none"
+                      style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <div 
+                    className="absolute h-3.5 w-3.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)] pointer-events-none z-10 opacity-0 group-hover:opacity-100 transition-opacity scale-75 group-hover:scale-100"
+                    style={{ left: `calc(${duration > 0 ? (currentTime / duration) * 100 : 0}% - 7px)` }}
                   />
                 </div>
-                <div className="flex justify-between mt-2 text-[10px] font-bold text-neutral-400 font-mono">
+                <div className="flex justify-between mt-1 text-[11px] font-medium text-white/50 font-mono tracking-wider">
                   <span>{formatTime(currentTime)}</span>
                   <span>{formatTime(duration)}</span>
                 </div>
               </div>
 
               {/* Centered Controls */}
-              <div className="relative flex items-center justify-center w-full h-16">
+              <div className="relative flex items-center justify-between w-full px-2">
                 {/* Left Button */}
                 <button 
                   onClick={() => setShowPlaylist(true)} 
-                  className="absolute left-0 p-2 text-neutral-400 hover:text-neutral-900 transition-colors"
+                  className="p-3 text-white/60 hover:text-white transition-colors"
                 >
                   <ListMusic className="w-6 h-6" />
                 </button>
 
                 {/* Center Group */}
-                <div className="flex items-center gap-8">
-                  <button onClick={onPrev} className="p-2 text-neutral-700 hover:text-neutral-900 transition-transform active:scale-90">
-                    <SkipBack className="w-7 h-7 fill-current" />
+                <div className="flex items-center gap-6">
+                  <button onClick={onPrev} className="p-3 text-white/80 hover:text-white transition-transform active:scale-90">
+                    <SkipBack className="w-8 h-8 fill-current" />
                   </button>
                   
                   <button 
                     onClick={onPlayPause}
-                    className="w-16 h-16 flex items-center justify-center bg-neutral-900 text-white rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all z-30"
+                    className="w-20 h-20 flex items-center justify-center bg-white text-black rounded-full shadow-[0_10px_30px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 transition-all z-30"
                   >
-                    {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
+                    {isPlaying ? <Pause className="w-10 h-10 fill-current" /> : <Play className="w-10 h-10 fill-current ml-1.5" />}
                   </button>
                   
-                  <button onClick={onNext} className="p-2 text-neutral-700 hover:text-neutral-900 transition-transform active:scale-90">
-                    <SkipForward className="w-7 h-7 fill-current" />
+                  <button onClick={onNext} className="p-3 text-white/80 hover:text-white transition-transform active:scale-90">
+                    <SkipForward className="w-8 h-8 fill-current" />
                   </button>
                 </div>
 
                 {/* Right Button */}
-                <button className="absolute right-0 p-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+                <button className="p-3 text-white/60 hover:text-white transition-colors">
                   <MoreHorizontal className="w-6 h-6" />
                 </button>
               </div>
@@ -1148,8 +1318,12 @@ export function MusicScreen({
                                     input.onchange = (ev: any) => {
                                       const file = ev.target.files?.[0];
                                       if (file) {
-                                        const url = URL.createObjectURL(file);
-                                        onUpdateSong(song.id, { cover: url });
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => {
+                                          const base64String = reader.result as string;
+                                          onUpdateSong(song.id, { cover: base64String });
+                                        };
+                                        reader.readAsDataURL(file);
                                       }
                                     };
                                     input.click();
@@ -1359,7 +1533,10 @@ export function MusicScreen({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/80 backdrop-blur-md"
-              onClick={() => setShowPersonaSelector(false)}
+              onClick={() => {
+                setShowPersonaSelector(false);
+                if (pendingShareLyrics) setPendingShareLyrics(null);
+              }}
             />
             <motion.div 
               initial={{ y: '100%' }}
@@ -1368,8 +1545,13 @@ export function MusicScreen({
               className="relative w-full bg-[#1a1a1a] rounded-t-3xl p-6 shadow-2xl border-t border-white/10 max-h-[70vh] flex flex-col"
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold">选择 AI 一起听</h3>
-                <button onClick={() => setShowPersonaSelector(false)}>
+                <h3 className="text-xl font-semibold">{pendingShareLyrics ? '分享给 AI' : '选择 AI 一起听'}</h3>
+                <button onClick={() => {
+                  setShowPersonaSelector(false);
+                  if (pendingShareLyrics) {
+                    setPendingShareLyrics(null);
+                  }
+                }}>
                   <ChevronDown className="w-6 h-6" />
                 </button>
               </div>
@@ -1381,7 +1563,14 @@ export function MusicScreen({
                   <button 
                     key={persona.id}
                     onClick={() => {
-                      onStartListeningWith(persona.id);
+                      if (pendingShareLyrics && onShareLyricsToChat) {
+                        onShareLyricsToChat(currentSong.title, pendingShareLyrics, persona.id);
+                        setPendingShareLyrics(null);
+                        setIsSelectingLyrics(false);
+                        setSelectedLyricIndices([]);
+                      } else {
+                        onStartListeningWith(persona.id);
+                      }
                       setShowPersonaSelector(false);
                     }}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${

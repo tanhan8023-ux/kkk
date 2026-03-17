@@ -46,18 +46,19 @@ export async function generateLyrics(
   // 3. Fallback to AI generation if LRCLIB fails
   const isDjVersion = title.toLowerCase().includes('dj') || title.includes('混音');
   const artistText = artist && artist !== "未知艺术家" ? `，歌手为“${artist}”` : '';
-  const prompt = `请在互联网（优先网易云音乐、QQ音乐、百度）上精准搜索歌曲《${title}》${artistText} 的歌词。
+  const prompt = `请在互联网上精准搜索歌曲《${title}》${artistText} 的歌词。
   
-  ${isDjVersion ? '【特别注意：这是一首 DJ 版/混音版歌曲，其节奏和间奏可能与原版完全不同，请务必寻找该特定版本的 LRC 歌词。】' : ''}
+  ${isDjVersion ? '【特别注意：这是一首 DJ 版/混音版歌曲，请务必寻找该特定版本的歌词。】' : ''}
   
   要求：
   1. 必须结合歌名和歌手名进行搜索，确保返回的是该特定艺人版本的歌词。
-  2. 必须返回带有时间戳的 LRC 格式歌词，例如 [00:12.34] 歌词内容。
-  3. 请确保歌词内容与歌曲版本完全匹配，尤其是时间戳必须与歌曲节奏同步。
-  4. 如果网上只有纯文本歌词，请你根据一般的歌曲节奏，自行估算并添加合理的时间戳，使其成为合法的 LRC 格式。
-  5. 绝对不要返回纯文本！每一行都必须以 [mm:ss.xx] 开头。
-  6. 如果没有找到任何相关歌词，请回复：“[00:00.00] 抱歉，未找到该歌曲的真实歌词。”
-  7. 只返回歌词文本或提示，不要有任何其他解释或开场白。`;
+  2. 优先返回带有时间戳的 LRC 格式歌词。
+  3. 如果网上只有纯文本歌词，请你根据一般的歌曲节奏，自行估算并添加合理的时间戳，使其成为合法的 LRC 格式。
+  4. 每一行歌词都应尽可能以 [mm:ss.xx] 开头。
+  5. 如果没有找到任何相关歌词，请回复：“[00:00.00] 抱歉，未找到该歌曲的歌词。”
+  6. 只返回歌词文本，不要有任何其他解释或开场白。`;
+  
+  console.log(`[Lyrics] AI generating for: ${title} - ${artist}`);
   
   const { responseText } = await fetchAiResponse(
     prompt,
@@ -76,9 +77,11 @@ export async function generateLyrics(
     [{ googleSearch: {} }], // Add googleSearch tool
     true // isSystemTask
   );
+  
+  console.log(`[Lyrics] AI response: ${responseText?.substring(0, 100)}...`);
 
-  if (!responseText || responseText.length < 20 || !responseText.includes('[')) {
-    return responseText || "[00:00.00] 抱歉，未找到该歌曲的真实歌词。";
+  if (!responseText || responseText.includes('抱歉')) {
+    return "[00:00.00] 抱歉，未找到该歌曲的歌词。";
   }
 
   return responseText;
@@ -660,6 +663,36 @@ async function describeImage(imageUrl: string, providedApiKey?: string): Promise
     console.error("Error describing image:", e);
     return null;
   }
+}
+
+export async function transcribeAudio(
+  audioBase64: string,
+  mimeType: string,
+  apiSettings: ApiSettings,
+  aiRef: React.MutableRefObject<GoogleGenAI | null>
+): Promise<string> {
+  // Always use Gemini for audio transcription since it natively supports multimodal audio
+  const apiKey = (apiSettings.apiUrl ? process.env.GEMINI_API_KEY : apiSettings.apiKey) || process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Gemini API Key is required for audio transcription");
+
+  const ai = new GoogleGenAI({ apiKey: apiKey as string });
+
+  const audioPart = {
+    inlineData: {
+      mimeType: mimeType,
+      data: audioBase64,
+    },
+  };
+  const promptPart = {
+    text: "请转录这段音频中的歌词。如果音频中有背景音乐，请忽略背景音乐，只提取歌词。请返回带有时间戳的 LRC 格式歌词。如果找不到歌词，请返回纯文本转录。",
+  };
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: { parts: [audioPart, promptPart] },
+  });
+
+  return response.text || "[00:00.00] 抱歉，无法从音频中提取歌词。";
 }
 
 export async function fetchAiResponse(
