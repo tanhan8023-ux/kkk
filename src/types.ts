@@ -108,6 +108,7 @@ export interface ApiSettings {
   autoPostMoments?: boolean;
   autoUpdateStatus?: boolean;
   isAutoXhsEnabled?: boolean;
+  isProactiveMessagingEnabled?: boolean;
 }
 
 export interface Widget {
@@ -216,6 +217,7 @@ export interface WorldbookSettings {
   globalPrompt: string;
   jailbreakPrompts?: string[];
   globalPrompts?: string[];
+  forceSegmentResponse?: boolean;
 }
 
 export interface Song {

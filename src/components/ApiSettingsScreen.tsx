@@ -21,6 +21,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   const [autoPostMoments, setAutoPostMoments] = useState(settings.autoPostMoments ?? true);
   const [autoUpdateStatus, setAutoUpdateStatus] = useState(settings.autoUpdateStatus ?? true);
   const [isAutoXhsEnabled, setIsAutoXhsEnabled] = useState(settings.isAutoXhsEnabled ?? true);
+  const [isProactiveMessagingEnabled, setIsProactiveMessagingEnabled] = useState(settings.isProactiveMessagingEnabled ?? true);
   const [voiceModel, setVoiceModel] = useState(settings.voiceModel || '');
   const [voiceApiUrl, setVoiceApiUrl] = useState(settings.voiceApiUrl || '');
   const [voiceApiKey, setVoiceApiKey] = useState(settings.voiceApiKey || '');
@@ -87,7 +88,7 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
   const handleSave = () => {
     onSave({ 
       apiUrl, apiKey, model, 
-      momentsApiUrl, momentsApiKey, momentsModel, autoPostMoments, autoUpdateStatus, isAutoXhsEnabled,
+      momentsApiUrl, momentsApiKey, momentsModel, autoPostMoments, autoUpdateStatus, isAutoXhsEnabled, isProactiveMessagingEnabled,
       voiceModel, voiceApiUrl, voiceApiKey, voiceParams, 
       asrModel, asrApiUrl, asrApiKey, asrParams, 
       temperature, proactiveDelay 
@@ -563,6 +564,16 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
               className={`w-10 h-6 rounded-full transition-colors ${isAutoXhsEnabled ? 'bg-emerald-500' : 'bg-neutral-300'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isAutoXhsEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <label className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider ml-1">AI 主动发消息</label>
+            <button
+              onClick={() => setIsProactiveMessagingEnabled(!isProactiveMessagingEnabled)}
+              className={`w-10 h-6 rounded-full transition-colors ${isProactiveMessagingEnabled ? 'bg-emerald-500' : 'bg-neutral-300'}`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isProactiveMessagingEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
             </button>
           </div>
 

@@ -80,7 +80,8 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
               jailbreakPrompt: imported.jailbreakPrompt || '',
               globalPrompt: imported.globalPrompt || '',
               jailbreakPrompts: imported.jailbreakPrompts || [],
-              globalPrompts: imported.globalPrompts || []
+              globalPrompts: imported.globalPrompts || [],
+              forceSegmentResponse: !!imported.forceSegmentResponse
             });
             alert('导入成功！');
           } else {
@@ -325,6 +326,19 @@ export function PersonaScreen({ worldbook: initialWorldbook, personas: initialPe
                 </button>
               </div>
             ))}
+
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-50">
+              <div className="space-y-1">
+                <label className="text-[13px] font-medium text-neutral-900">强制全员分段回复</label>
+                <p className="text-[11px] text-neutral-500">开启后，所有角色都将强制使用分段回复模式。</p>
+              </div>
+              <button 
+                onClick={() => setWorldbook({ ...worldbook, forceSegmentResponse: !worldbook.forceSegmentResponse })}
+                className={`w-11 h-6 rounded-full transition-colors relative ${worldbook.forceSegmentResponse ? 'bg-blue-500' : 'bg-neutral-200'}`}
+              >
+                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${worldbook.forceSegmentResponse ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
           </div>
         </div>
 

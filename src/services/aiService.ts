@@ -239,6 +239,9 @@ export async function generatePersonaStatus(
   return responseText;
 }
 
+// Cache for offline status to avoid excessive API calls
+const offlineStatusCache = new Map<string, { isOffline: boolean; timestamp: number }>();
+
 export async function checkIfPersonaIsOffline(
   persona: Persona,
   apiSettings: ApiSettings,
@@ -247,6 +250,13 @@ export async function checkIfPersonaIsOffline(
   aiRef: React.MutableRefObject<GoogleGenAI | null>,
   contextMessages: { role: string; content: string }[] = []
 ): Promise<boolean> {
+  // Check cache first (valid for 10 minutes)
+  const cached = offlineStatusCache.get(persona.id);
+  const now = Date.now();
+  if (cached && (now - cached.timestamp < 10 * 60 * 1000)) {
+    return cached.isOffline;
+  }
+
   const prompt = `你现在是${persona.name}。请根据你的人设、当前心情、当前情景、现在的时间以及最近的聊天记录，深度判断你现在是否“在线”（可以回复用户）还是“离线”（不方便回复）。
 
 人设设定：${persona.instructions}
@@ -281,7 +291,9 @@ export async function checkIfPersonaIsOffline(
     true // isSystemTask
   );
   
-  return responseText.includes('离线');
+  const isOffline = responseText.includes('离线');
+  offlineStatusCache.set(persona.id, { isOffline, timestamp: Date.now() });
+  return isOffline;
 }
 
 export async function summarizeChat(
@@ -777,7 +789,7 @@ export async function fetchAiResponse(
     "   - “请问您还有其他问题吗？”\n" +
     "   - “我是一个语言模型...”",
     enableQuote ? "【功能提示】你可以引用之前的消息进行回复。如果需要引用，请在回复的最开头加上 [QUOTE: 消息ID]，例如：[QUOTE: 123456789] 你的回复内容。消息ID会在上下文的 [ID: xxx] 中提供。请只在觉得非常有必要引用时才使用此功能，不要每句话都引用。注意：回复中不要包含 [ID: xxx]。" : "",
-    persona.isSegmentResponse ? "【分段回复要求】请务必将你的回复分成多个短句，每句话之间必须用换行符（\\n）分隔。不要把所有内容写在一段里，要像真人连续发多条微信一样，每条消息简短自然。例如：\n第一句话\n第二句话\n第三句话" : "",
+    (persona.isSegmentResponse || worldbook.forceSegmentResponse) ? "【分段回复要求】请务必将你的回复分成多个短句，每句话之间必须用换行符（\n）分隔。不要把所有内容写在一段里，要像真人连续发多条微信一样，每条消息简短自然。例如：\n第一句话\n第二句话\n第三句话" : "",
     "【特殊功能指令】你可以通过以下指令触发特殊交互。请注意：\n" +
     "1. **必须**直接使用指令标签，**严禁**在回复中用文字描述“我给你转账了”、“我给你点了外卖”等动作。例如：\n" +
     "   - 错误：我给你转了520元，拿去花吧。\n" +

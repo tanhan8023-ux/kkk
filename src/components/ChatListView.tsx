@@ -76,7 +76,7 @@ export const ChatListView = ({
               <div className="flex justify-between items-center">
                 <h3 className="text-[16px] font-medium text-neutral-900 truncate pr-2">
                   {g.name}
-                  <span className="ml-1 text-[12px] text-neutral-400 font-normal">({g.memberIds.length + 1})</span>
+                  <span className="ml-1 text-[12px] text-neutral-400 font-normal">({g.memberIds.length})</span>
                 </h3>
                 <span className="text-[12px] text-neutral-400">
                   {lastMsg ? formatRelativeTime(lastMsg.createdAt) : ''}

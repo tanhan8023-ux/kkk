@@ -669,8 +669,8 @@ export default function App() {
     if (!isReady || !hasApiKey || apiSettings.isAutoXhsEnabled === false) return;
 
     const interval = setInterval(async () => {
-      // 30% chance to generate a new post every 1 minute for more dynamic feel
-      if (Math.random() > 0.3) return;
+      // 10% chance to generate a new post every 5 minutes for more natural feel
+      if (Math.random() > 0.1) return;
       
       try {
         const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
@@ -691,10 +691,10 @@ export default function App() {
       } catch (e) {
         console.error("Failed to generate background XHS post:", e);
       }
-    }, 60000); // Check every 1 minute
+    }, 5 * 60 * 1000); // Check every 5 minutes instead of 1
 
     return () => clearInterval(interval);
-  }, [isReady, hasApiKey, apiSettings, worldbook, userProfile]);
+  }, [isReady, hasApiKey, apiSettings.isAutoXhsEnabled]); // Reduced dependencies to avoid frequent restarts
 
   const handleXhsRefresh = async () => {
     if (isGeneratingXhs || !hasApiKey) return;
@@ -1008,10 +1008,10 @@ export default function App() {
         }
       }
       
-    }, 300000); // Every 5 minutes
+    }, 10 * 60 * 1000); // Every 10 minutes instead of 5
     
     return () => clearInterval(interval);
-  }, [personas, apiSettings, worldbook, userProfile, isReady, currentChatId, lastApiErrorTime]);
+  }, [isReady, apiSettings.autoUpdateStatus, lastApiErrorTime]); // Reduced dependencies to avoid frequent restarts
 
   // Autonomous Diary Generation
   useEffect(() => {
@@ -1020,6 +1020,7 @@ export default function App() {
     const checkAndGenerateDiaries = async () => {
       const today = new Date().toLocaleDateString('zh-CN');
       
+      // Use a local copy of personas to avoid dependency on the state itself
       for (const persona of personas) {
         // Check if diary exists for today
         const entries = persona.diaryEntries || [];
@@ -1077,10 +1078,11 @@ export default function App() {
     const interval = setInterval(checkAndGenerateDiaries, 60 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [personas, apiSettings, worldbook, userProfile, isReady]);
+  }, [isReady]); // Removed personas and other settings from dependencies to break the infinite loop
 
   // Background message simulator
   useEffect(() => {
+    if (apiSettings.isProactiveMessagingEnabled === false) return;
     const timer = setTimeout(() => {
       if (messages.length === 0 && personas.length > 0) {
         const firstPersona = personas[0];
@@ -1096,7 +1098,7 @@ export default function App() {
 
   // AI coaxing user in XHS or Phone when blocked
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || apiSettings.isProactiveMessagingEnabled === false) return;
     const interval = setInterval(async () => {
       if (Date.now() - lastApiErrorTime < 15 * 60 * 1000) return;
       

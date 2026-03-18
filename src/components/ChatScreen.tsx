@@ -148,6 +148,54 @@ export function ChatScreen({
   // Transfer State
   const [showTransferModal, setShowTransferModal] = useState(false);
   
+  const prevMessagesLength = useRef(messages.length);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+    if (messages.length > prevMessagesLength.current) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === 'model' && theme.notificationSound && !isPlaying) {
+        const audio = new Audio(theme.notificationSound);
+        audio.play().catch(e => console.error("Failed to play notification sound", e));
+      }
+    }
+    prevMessagesLength.current = messages.length;
+  }, [messages, theme.notificationSound, isPlaying]);
+
+  const getCrossContextMemory = useCallback((personaId: string, currentGroupId?: string) => {
+    let recentOtherMessages = [];
+    if (currentGroupId) {
+      // In a group chat, fetch recent private messages with this persona
+      recentOtherMessages = messagesRef.current
+        .filter(m => m.personaId === personaId && !m.groupId && !m.hidden)
+        .slice(-5);
+    } else {
+      // In a private chat, fetch recent group messages involving this persona
+      const personaName = personas.find(p => p.id === personaId)?.name || '';
+      recentOtherMessages = messagesRef.current
+        .filter(m => m.groupId && (m.personaId === personaId || m.text.includes(`@${personaName}`)) && !m.hidden)
+        .slice(-5);
+    }
+
+    if (recentOtherMessages.length === 0) return "";
+
+    const contextStr = recentOtherMessages.map(m => {
+      let senderName = '用户';
+      if (m.role === 'model') {
+        if (m.personaId === personaId) {
+          senderName = '你';
+        } else {
+          senderName = personas.find(p => p.id === m.personaId)?.name || '其他群成员';
+        }
+      }
+      const groupInfo = m.groupId ? `(在群聊"${groups.find(g=>g.id===m.groupId)?.name || '未知群聊'}"中)` : '(在私聊中)';
+      return `${groupInfo} ${senderName}: ${m.text}`;
+    }).join('\n');
+
+    return `\n\n【跨聊天记忆】\n你（或用户）最近在其他聊天中有以下互动记录，请在回复时保持记忆连贯：\n${contextStr}`;
+  }, [personas, groups]);
+
   // Unread Reaction State
   const [unreadPesterCount, setUnreadPesterCount] = useState(0);
   const unreadTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,7 +222,7 @@ export function ChatScreen({
     }
 
     // If last message is from AI and is read (and we are not currently typing/generating)
-    if (lastMsg.role === 'model' && (lastMsg.isRead || lastMsg.status === 'read') && !isTyping && !isLoading) {
+    if (lastMsg.role === 'model' && (lastMsg.isRead || lastMsg.status === 'read') && !isTyping && !isLoading && apiSettings.isProactiveMessagingEnabled !== false) {
       
       // Determine delay based on pester count
       // First check: 5m 15s (simulate "waiting for reply")
@@ -218,7 +266,10 @@ export function ChatScreen({
   useEffect(() => {
     const persona = personas.find(p => p.id === currentChatId);
     if (persona) {
-      const contextMessages = messages.slice(-20).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }));
+      const contextMessages = messages
+        .filter(m => m.personaId === persona.id && !m.groupId)
+        .slice(-20)
+        .map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }));
       checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, contextMessages).then(isOffline => {
         setPersonas(prev => prev.map(p => p.id === persona.id ? { ...p, isOffline } : p));
       });
@@ -227,7 +278,7 @@ export function ChatScreen({
 
   // Group chat idle conversation starter
   useEffect(() => {
-    if (!currentGroupId || !isActive) return;
+    if (!currentGroupId || !isActive || apiSettings.isProactiveMessagingEnabled === false) return;
     
     const currentGroup = groups.find(g => g.id === currentGroupId);
     if (!currentGroup) return;
@@ -236,9 +287,9 @@ export function ChatScreen({
       const lastMsg = messagesRef.current.filter(m => m.groupId === currentGroupId).pop();
       if (!lastMsg) return;
 
-      // If the last message was sent more than 5 minutes ago, there's a small chance to start a new topic
+      // If the last message was sent more than 10 minutes ago, there's a small chance to start a new topic
       const timeSinceLastMsg = Date.now() - (lastMsg.createdAt || 0);
-      if (timeSinceLastMsg > 5 * 60 * 1000 && Math.random() < 0.1) { // 10% chance every minute
+      if (timeSinceLastMsg > 10 * 60 * 1000 && Math.random() < 0.1) { // 10% chance every 5 minutes
         const otherMemberIds = currentGroup.memberIds.filter(id => id !== 'user');
         if (otherMemberIds.length === 0) return;
 
@@ -253,7 +304,7 @@ export function ChatScreen({
           .filter(m => m.groupId === currentGroupId && !m.hidden)
           .slice(-10)
           .map(m => {
-            let role = m.role === 'model' ? 'assistant' : 'user';
+            let role = (m.role === 'model' && m.personaId === persona.id) ? 'assistant' : 'user';
             let content = m.text;
             if (m.role === 'model') {
               const sender = personas.find(p => p.id === m.personaId);
@@ -264,9 +315,11 @@ export function ChatScreen({
             return { role, content };
           });
 
+        const crossContextMemory = getCrossContextMemory(persona.id, currentGroupId);
+
         const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。群里已经安静了一段时间了。
 你是群成员之一：${persona.name}。
-人设：${persona.instructions}
+人设：${persona.instructions}${crossContextMemory}
 
 请根据你的性格，决定你现在是否要主动在群里找大家聊天、分享事情或者抛出一个新话题。
 - 如果你想主动说话，请直接输出你的发言内容。
@@ -276,7 +329,8 @@ export function ChatScreen({
           const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
           
           if (!response.responseText.includes('[NO_REPLY]')) {
-            const texts = persona.isSegmentResponse ? response.responseText.split('\\n').filter(t => t.trim()) : [response.responseText];
+            const isSegment = persona.isSegmentResponse || worldbook.forceSegmentResponse;
+            const texts = isSegment ? response.responseText.split(/[\n\r]+|\\n/).filter(t => t.trim()) : [response.responseText];
 
             texts.forEach((text, index) => {
               const aiMsg: Message = {
@@ -298,14 +352,14 @@ export function ChatScreen({
           console.error("Group idle starter error:", e);
         }
       }
-    }, 60000); // Check every minute
+    }, 5 * 60 * 1000); // Check every 5 minutes instead of 1
 
     return () => clearInterval(intervalId);
   }, [currentGroupId, isActive, groups, personas, apiSettings, worldbook, userProfile]);
 
   // Group chat spontaneous reply logic
   useEffect(() => {
-    if (!currentGroupId || !isActive) return;
+    if (!currentGroupId || !isActive || apiSettings.isProactiveMessagingEnabled === false) return;
     
     const currentGroup = groups.find(g => g.id === currentGroupId);
     if (!currentGroup) return;
@@ -315,9 +369,6 @@ export function ChatScreen({
 
     // Don't evaluate the same message multiple times
     if (lastEvaluatedGroupMsgId.current === lastMsg.id) return;
-
-    // Don't trigger if someone is already typing
-    if (isTyping) return;
 
     // Only trigger if the last message was sent recently (e.g., within 1 minute)
     if (Date.now() - (lastMsg.createdAt || 0) > 60000) return;
@@ -343,16 +394,12 @@ export function ChatScreen({
         const persona = personas.find(p => p.id === memberId);
         if (!persona) continue;
 
-        // Check if offline
-        const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, []);
-        if (isOffline) continue;
-
         // Ask this persona if they want to reply
         const contextMessages = messagesRef.current
           .filter(m => m.groupId === currentGroupId && !m.hidden)
           .slice(-15)
           .map(m => {
-            let role = m.role === 'model' ? 'assistant' : 'user';
+            let role = (m.role === 'model' && m.personaId === persona.id) ? 'assistant' : 'user';
             let content = m.text;
             if (m.role === 'model') {
               const sender = personas.find(p => p.id === m.personaId);
@@ -363,44 +410,94 @@ export function ChatScreen({
             return { role, content };
           });
 
+        // Check if the persona is explicitly mentioned
+        const isMentioned = lastMsg.text.includes(`@${persona.name}`);
+
+        // Check if offline
+        const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, contextMessages);
+        
+        // If offline and not mentioned, they don't even "see" the message
+        if (isOffline && !isMentioned) continue;
+
+        const crossContextMemory = getCrossContextMemory(persona.id, currentGroupId);
+
         const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。以上是群聊记录。
 你是群成员之一：${persona.name}。
-人设：${persona.instructions}
+人设：${persona.instructions}${crossContextMemory}
+${isOffline ? '【特殊提示】你当前处于“离线”状态，但有人在群里@了你。请根据你的人设决定是继续保持沉默、发个自动回复、还是被吵醒并回复。' : ''}
 
 请根据你的性格、当前聊天氛围以及最后一条消息的内容，决定你现在是否要发言。
-- 如果你觉得有话想说（比如接话、吐槽、回答问题、或者主动挑起话题），请直接输出你的回复内容。
-- 如果你觉得现在不需要你说话，或者你想保持沉默，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。
+${isMentioned ? '- 有人@了你，或者明确向你提问，请务必直接输出你的回复内容，不要保持沉默。' : '- 如果你觉得有话想说（比如接话、吐槽、回答问题、或者主动挑起话题），请直接输出你的回复内容。\n- 如果你觉得现在不需要你说话，或者你想保持沉默，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。'}
+${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理人）决定连看都不看这条消息，请输出 [UNREAD]。这会让消息保持“未读”状态。' : ''}
 注意：不要每次都回复，要像真人一样自然。群里还有其他人，你可以和他们互动。]`;
+
+        // Mark message as read by this persona immediately when they start "reading" it
+        // Also mark all previous unread messages in this group as read by this persona
+        setMessages(prev => prev.map(m => {
+          if (m.groupId === currentGroupId && (m.id === lastMsg.id || (m.createdAt || 0) <= (lastMsg.createdAt || 0))) {
+            if (!m.readBy?.includes(persona.id)) {
+              return { ...m, readBy: Array.from(new Set([...(m.readBy || []), persona.id])) };
+            }
+          }
+          return m;
+        }));
 
         try {
           // Use a fast model for this check
           const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
           
           // Check if another message was sent while we were generating
-          if (messagesRef.current[messagesRef.current.length - 1].id !== lastMsg.id) {
+          // If mentioned, we should still try to reply unless the new message is also a mention for us
+          const latestMsg = messagesRef.current[messagesRef.current.length - 1];
+          if (latestMsg.id !== lastMsg.id && !isMentioned) {
             break; // Abort this evaluation, the new message will trigger a new one
           }
+          
+          // If mentioned but a newer message also mentions us, we might want to skip this one and reply to the latest
+          if (isMentioned && latestMsg.id !== lastMsg.id && latestMsg.text.includes(`@${persona.name}`)) {
+            break;
+          }
 
-          if (!response.responseText.includes('[NO_REPLY]')) {
+          if (response.responseText.includes('[UNREAD]') && !isMentioned) {
+             // This persona decided NOT to read the message.
+             // We should revert the readBy status for this persona.
+             setMessages(prev => prev.map(m => {
+               if (m.groupId === currentGroupId && (m.id === lastMsg.id || (m.createdAt || 0) <= (lastMsg.createdAt || 0))) {
+                 return { ...m, readBy: (m.readBy || []).filter(id => id !== persona.id) };
+               }
+               return m;
+             }));
+             continue; // Move to next persona
+          }
+
+          if (!response.responseText.includes('[NO_REPLY]') || isMentioned) {
             // This persona decided to reply!
-            const texts = persona.isSegmentResponse ? response.responseText.split('\\n').filter(t => t.trim()) : [response.responseText];
+            let responseText = response.responseText.replace('[NO_REPLY]', '').replace('[UNREAD]', '').trim();
+            if (!responseText && isMentioned) {
+              responseText = "嗯？叫我干嘛？"; // Fallback if it still outputs NO_REPLY when mentioned
+            }
 
-            texts.forEach((text, index) => {
-              const aiMsg: Message = {
-                id: (Date.now() + Math.random() + index).toString(),
-                personaId: persona.id,
-                groupId: currentGroupId,
-                role: 'model',
-                text: text.replace('[NO_REPLY]', '').trim(),
-                msgType: 'text',
-                timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-                isRead: false,
-                createdAt: Date.now() + 500 + (index * 1000),
-              };
-              
-              setMessages(prev => [...prev, aiMsg]);
-            });
-            break; // Only one persona replies at a time
+            if (responseText) {
+              const isSegment = persona.isSegmentResponse || worldbook.forceSegmentResponse;
+              const texts = isSegment ? responseText.split(/[\n\r]+|\\n/).filter(t => t.trim()) : [responseText];
+
+              texts.forEach((text, index) => {
+                const aiMsg: Message = {
+                  id: (Date.now() + Math.random() + index).toString(),
+                  personaId: persona.id,
+                  groupId: currentGroupId,
+                  role: 'model',
+                  text: text,
+                  msgType: 'text',
+                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                  isRead: false,
+                  createdAt: Date.now() + 500 + (index * 1000),
+                };
+                
+                setMessages(prev => [...prev, aiMsg]);
+              });
+              break; // Only one persona replies at a time
+            }
           }
         } catch (e) {
           console.error("Group spontaneous reply error:", e);
@@ -444,7 +541,7 @@ export function ChatScreen({
 如果你决定**完全不发送任何消息**（保持沉默），请仅输出：\`[NO_REPLY]\`
 `;
 
-      if (persona.isSegmentResponse) {
+      if (persona.isSegmentResponse || worldbook.forceSegmentResponse) {
         pesterPrompt += "\n\n【分段回复要求】请务必将你的回复分成多个短句，每句话之间必须用换行符（\\n）分隔。不要把所有内容写在一段里，要像真人连续发多条微信一样，每条消息简短自然。例如：\n第一句话\n第二句话\n第三句话";
       }
 
@@ -468,7 +565,7 @@ export function ChatScreen({
         persona.isOffline
       );
 
-      const processed = processAiResponseParts(response.responseText, undefined, persona.isSegmentResponse);
+      const processed = processAiResponseParts(response.responseText, undefined, persona.isSegmentResponse || worldbook.forceSegmentResponse);
       
       if (response.responseText.includes('[NO_REPLY]')) {
         setIsTyping(false);
@@ -639,10 +736,9 @@ export function ChatScreen({
 
   // Autonomous posting logic
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || apiSettings.autoPostMoments === false) return;
 
     const checkAndPost = async () => {
-      if (apiSettings.autoPostMoments === false) return;
       const now = Date.now();
       // Check every 10-20 minutes (randomized)
       if (now - lastAutonomousPostTime.current < (10 + Math.random() * 10) * 60 * 1000) return;
@@ -676,9 +772,9 @@ export function ChatScreen({
       }
     };
 
-    const interval = setInterval(checkAndPost, 60 * 1000); // Check every minute
+    const interval = setInterval(checkAndPost, 5 * 60 * 1000); // Check every 5 minutes instead of 1
     return () => clearInterval(interval);
-  }, [isActive, personas, apiSettings, worldbook, setMoments]);
+  }, [isActive, apiSettings.autoPostMoments]); // Reduced dependencies to avoid frequent restarts
 
   const handleVoiceChat = () => {
     setIsVoiceChatActive(!isVoiceChatActive);
@@ -769,24 +865,6 @@ export function ChatScreen({
     };
   }, []);
 
-  const prevMessagesLength = useRef(messages.length);
-  const messagesRef = useRef(messages);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-    if (messages.length > prevMessagesLength.current) {
-      const lastMsg = messages[messages.length - 1];
-      // Play sound if it's a new message from the model AND it's not a "typing" indicator or similar (though here we only have final messages)
-      // Also check if the chat screen is active or if we want to play it regardless
-      // Disable notification sound if music is playing to prevent interruption
-      if (lastMsg.role === 'model' && theme.notificationSound && !isPlaying) {
-        const audio = new Audio(theme.notificationSound);
-        audio.play().catch(e => console.error("Failed to play notification sound", e));
-      }
-    }
-    prevMessagesLength.current = messages.length;
-  }, [messages, theme.notificationSound]);
-
   const formatRelativeTime = (timestampMs: number | undefined) => {
     if (!timestampMs) return '';
     const diff = currentTime - timestampMs;
@@ -805,7 +883,7 @@ export function ChatScreen({
   useEffect(() => {
     setVisibleMessagesCount(200);
     isNearBottomRef.current = true;
-  }, [currentChatId]);
+  }, [currentChatId, currentGroupId]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop === 0 && visibleMessagesCount < currentMessages.length) {
@@ -874,16 +952,16 @@ export function ChatScreen({
   }, [theme.chatBubbleUserCss, theme.chatBubbleAiCss, theme.innerVoiceCss]);
 
   useEffect(() => {
-    if (isActive && activeTab === 'chat' && currentChatId) {
+    if (isActive && activeTab === 'chat' && (currentChatId || currentGroupId)) {
       onClearUnread();
       if (isNearBottomRef.current) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
       }
     }
-  }, [messages, activeTab, currentChatId, onClearUnread, isActive]);
+  }, [messages, activeTab, currentChatId, currentGroupId, onClearUnread, isActive]);
 
   useEffect(() => {
-    if (!currentChatId || pendingRequests.current > 0) return;
+    if (!currentChatId || pendingRequests.current > 0 || apiSettings.isProactiveMessagingEnabled === false) return;
     
     const delayMs = (apiSettings.proactiveDelay || 10) * 60 * 1000;
 
@@ -922,7 +1000,7 @@ export function ChatScreen({
               return;
             }
 
-            const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+            const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
             const aiQuotedId = processed.quotedMessageId;
 
             if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
@@ -1059,7 +1137,7 @@ export function ChatScreen({
     
     let rawParts = text.split(allTagsRegex).filter(p => p && p.trim() !== '|||');
     if (isSegmentResponse) {
-      rawParts = rawParts.flatMap(p => p.split('\n').filter(l => l.trim()));
+      rawParts = rawParts.flatMap(p => p.split(/[\n\r]+|\\n/).filter(l => l.trim()));
     }
     const processedParts: any[] = [];
     let currentQuotedId = aiQuotedId;
@@ -1139,7 +1217,7 @@ export function ChatScreen({
         if (cleanText) {
           if (isSegmentResponse) {
             // Updated segmentation regex to be more comprehensive
-            const segments = cleanText.split(/([。！？\n!?]+|(?:\.\.\.+))/).filter((s: string) => s.trim().length > 0);
+            const segments = cleanText.split(/([。！？\n!?]+|(?:\.\.\.+)|\\n)/).filter((s: string) => s.trim().length > 0);
             for (let i = 0; i < segments.length; i++) {
               if (i > 0 && segments[i].match(/^[。！？\n!?.]+/)) {
                 if (processedParts.length > 0 && processedParts[processedParts.length - 1].msgType === 'text') {
@@ -1398,7 +1476,10 @@ export function ChatScreen({
            if (playedTheaters.length > 0) {
              memoryText = `\n【平行世界记忆（剧场模式）】\n你和用户在平行世界（剧场模式）中共同经历了以下剧本的故事：${playedTheaters.join('、')}。\n这些是你们共同的珍贵回忆。虽然现在的对话发生在现实世界（微信聊天），但如果用户提起这些剧场里的事情，请带着那份情感和记忆进行回应，不要假装不知道。但在用户未提及时，请保持当前的现实人设，不要主动混淆现实与剧场。`;
            }
-           additionalSystemInstructions = `【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。${memoryText}`;
+           
+           const crossContextMemory = getCrossContextMemory(personaForResponse.id);
+           
+           additionalSystemInstructions = `【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。${memoryText}${crossContextMemory}`;
         }
 
         // Get the latest messages for context (including the ones sent during debounce)
@@ -1493,7 +1574,7 @@ export function ChatScreen({
         
         let finalResponseText = responseTextWithQuote;
         
-        const processed = processAiResponseParts(finalResponseText, undefined, personaForResponse.isSegmentResponse);
+        const processed = processAiResponseParts(finalResponseText, undefined, personaForResponse.isSegmentResponse || worldbook.forceSegmentResponse);
         const aiQuotedId = processed.quotedMessageId;
 
         if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
@@ -1577,7 +1658,7 @@ export function ChatScreen({
                     content: `[ID: ${m.id}] ${m.id === lastAiMsgId ? '[此消息已撤回]' : (m.isRecalled ? '[此消息已撤回]' : m.text)}`
                   }));
                   const aiResponse = await fetchAiResponse(recallPrompt, recallContext, currentPersona, apiSettings, worldbook, userProfile, aiRef);
-                  const processedRecall = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+                  const processedRecall = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
                   
                   for (let i = 0; i < processedRecall.parts.length; i++) {
                     const part = processedRecall.parts[i];
@@ -1708,7 +1789,7 @@ export function ChatScreen({
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
-        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
         const aiQuotedId = processed.quotedMessageId;
 
         if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
@@ -1834,7 +1915,7 @@ export function ChatScreen({
           setMessages(prev => prev.map(m => (m.role === 'user' && (!m.isRead || m.status !== 'read')) ? { ...m, isRead: true, status: 'read' } : m));
         }
         
-        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+        const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
         
         for (let i = 0; i < processed.parts.length; i++) {
           const part = processed.parts[i];
@@ -1924,7 +2005,7 @@ export function ChatScreen({
         undefined,
         true
       );
-      const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse);
+      const processed = processAiResponseParts(aiResponse.responseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
       let innerVoiceText = processed.parts.map(p => p.text).join(' ');
       
       // Extract mood
@@ -2016,7 +2097,7 @@ export function ChatScreen({
       
       let finalResponseText = aiResponse.responseText;
       
-      const processed = processAiResponseParts(finalResponseText, undefined, currentPersona.isSegmentResponse);
+      const processed = processAiResponseParts(finalResponseText, undefined, currentPersona.isSegmentResponse || worldbook.forceSegmentResponse);
       const aiQuotedId = processed.quotedMessageId;
 
       if (processed.orderItems && processed.orderItems.length > 0 && onAiOrder) {
