@@ -466,7 +466,7 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
 
         try {
           // Use a fast model for this check
-          const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
+          const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview", undefined, false, undefined, undefined, false, true);
           
           // Check if another message was sent while we were generating
           const latestMsg = messagesRef.current[messagesRef.current.length - 1];
