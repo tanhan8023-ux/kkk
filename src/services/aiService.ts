@@ -770,19 +770,19 @@ export async function fetchAiResponse(
     return result;
   };
 
-  const jailbreakPrompts = truncatePromptList([worldbook.jailbreakPrompt, ...(worldbook.jailbreakPrompts || [])].filter(Boolean), 2000);
-  const globalPrompts = truncatePromptList([worldbook.globalPrompt, ...(worldbook.globalPrompts || [])].filter(Boolean), 2000);
-  const personaPrompts = truncatePromptList([persona.prompt, ...(persona.prompts || [])].filter(Boolean), 1500);
+  const jailbreakPrompts = truncatePromptList([worldbook.jailbreakPrompt, ...(worldbook.jailbreakPrompts || [])].filter(Boolean), 4000);
+  const globalPrompts = truncatePromptList([worldbook.globalPrompt, ...(worldbook.globalPrompts || [])].filter(Boolean), 4000);
+  const personaPrompts = truncatePromptList([persona.prompt, ...(persona.prompts || [])].filter(Boolean), 2000);
 
   const fullSystemInstruction = isSystemTask ? [
-    ...jailbreakPrompts,
-    ...globalPrompts,
+    globalPrompts.length > 0 ? `【世界书：核心全局规则 - 必须严格遵守】\n${globalPrompts.join('\n')}` : "",
+    jailbreakPrompts.length > 0 ? `【高级指令：破限协议】\n${jailbreakPrompts.join('\n')}` : "",
     persona.instructions ? `【角色人设】\n${persona.instructions}` : "",
     ...personaPrompts,
     additionalSystemInstructions
   ].filter(Boolean).join('\n\n') : [
-    ...jailbreakPrompts,
-    ...globalPrompts,
+    globalPrompts.length > 0 ? `【世界书：核心全局规则 - 必须严格遵守】\n${globalPrompts.join('\n')}` : "",
+    jailbreakPrompts.length > 0 ? `【高级指令：破限协议】\n${jailbreakPrompts.join('\n')}` : "",
     memoryInstruction,
     `【当前时间】现在是 ${timeString} 星期${dayOfWeek}。请在对话中自然地体现出对时间的感知（例如：早上好、该吃午饭了、这么晚还不睡等），但不要生硬地报时。`,
     isOffline ? `【当前状态】你目前处于“离线”状态。请根据你的人设生成一条自动回复，告知用户你稍后回复。⚠️注意：你的回复必须以“[自动回复] ”开头！例如：“[自动回复] 我现在有点忙，稍后找你。”` : `【当前状态】你目前处于“在线”状态。`,

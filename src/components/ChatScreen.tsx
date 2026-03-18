@@ -459,21 +459,10 @@ export function ChatScreen({
 人设：${persona.instructions}${crossContextMemory}
 ${isOffline ? '【特殊提示】你当前处于“离线”状态，但有人在群里@了你。请根据你的人设决定是继续保持沉默、发个自动回复、还是被吵醒并回复。' : ''}
 
-请根据你的性格、当前聊天氛围以及最后一条消息的内容，决定你现在是否要发言。
+请根据你的性格、当前聊天氛围、最后一条消息的内容以及【世界书】中的全局规则，决定你现在是否要发言。
 ${isMentioned ? '- 有人@了你，或者明确向你提问，请务必直接输出你的回复内容，不要保持沉默。' : '- 如果你觉得有话想说（比如接话、吐槽、回答问题、或者主动挑起话题），请直接输出你的回复内容。\n- 如果你觉得现在不需要你说话，或者你想保持沉默，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。'}
 ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理人）决定连看都不看这条消息，请输出 [UNREAD]。这会让消息保持“未读”状态。' : ''}
-注意：不要每次都回复，要像真人一样自然。群里还有其他人，你可以和他们互动。]`;
-
-        // Mark message as read by this persona immediately when they start "reading" it
-        // Also mark all previous unread messages in this group as read by this persona
-        setMessages(prev => prev.map(m => {
-          if (m.groupId === currentGroupId && (m.id === lastMsg.id || (m.createdAt || 0) <= (lastMsg.createdAt || 0))) {
-            if (!m.readBy?.includes(persona.id)) {
-              return { ...m, readBy: Array.from(new Set([...(m.readBy || []), persona.id])) };
-            }
-          }
-          return m;
-        }));
+注意：【世界书】中的全局规则具有最高优先级。如果规则规定在某些情况下不应回复，请务必遵守。不要每次都回复，要像真人一样自然。群里还有其他人，你可以和他们互动。]`;
 
         try {
           // Use a fast model for this check
@@ -490,19 +479,26 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
             break;
           }
 
-          if (response.responseText.includes('[UNREAD]') && !isMentioned) {
-             // This persona decided NOT to read the message.
-             // We should revert the readBy status for this persona.
-             setMessages(prev => prev.map(m => {
-               if (m.groupId === currentGroupId && (m.id === lastMsg.id || (m.createdAt || 0) <= (lastMsg.createdAt || 0))) {
-                 return { ...m, readBy: (m.readBy || []).filter(id => id !== persona.id) };
-               }
-               return m;
-             }));
+          const isUnread = response.responseText.includes('[UNREAD]') && !isMentioned;
+          const isNoReply = response.responseText.includes('[NO_REPLY]') && !isMentioned;
+
+          if (!isUnread) {
+            // Mark message as read by this persona if they didn't explicitly choose [UNREAD]
+            setMessages(prev => prev.map(m => {
+              if (m.groupId === currentGroupId && (m.id === lastMsg.id || (m.createdAt || 0) <= (lastMsg.createdAt || 0))) {
+                if (!m.readBy?.includes(persona.id)) {
+                  return { ...m, readBy: Array.from(new Set([...(m.readBy || []), persona.id])) };
+                }
+              }
+              return m;
+            }));
+          }
+
+          if (isUnread) {
              continue; // Move to next persona
           }
 
-          if (!response.responseText.includes('[NO_REPLY]') || isMentioned) {
+          if (!isNoReply || isMentioned) {
             // This persona decided to reply!
             let responseText = response.responseText.replace('[NO_REPLY]', '').replace('[UNREAD]', '').trim();
             if (!responseText && isMentioned) {
@@ -2667,6 +2663,7 @@ ${recentMessages}
         {activeTab === 'chat' && !currentChatId && !currentGroupId && (
           <div className="absolute inset-0 bg-white overflow-y-auto pb-[80px]">
             <ChatListView 
+              key={`chatlist-${userProfile.avatarUrl}-${userProfile.name}`}
               personas={personas}
               messages={messages}
               userProfile={userProfile}
