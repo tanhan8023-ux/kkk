@@ -269,7 +269,7 @@ export function ChatScreen({
     }
   }, [currentChatId, messages]);
 
-  // Check persona status when switching chat
+ // Check persona status when switching chat
   useEffect(() => {
     const persona = personas.find(p => p.id === currentChatId);
     if (persona) {
@@ -283,6 +283,99 @@ export function ChatScreen({
     }
   }, [currentChatId, personas, messages]);
 
+  // Group chat idle conversation starter
+  useEffect(() => {
+    if (!currentGroupId || !isActive || apiSettings.isProactiveMessagingEnabled === false) return;
+    
+    const currentGroup = groups.find(g => g.id === currentGroupId);
+    if (!currentGroup) return;
+
+    const intervalId = setInterval(async () => {
+      const lastMsg = messagesRef.current.filter(m => m.groupId === currentGroupId).pop();
+      if (!lastMsg) return;
+
+      const timeSinceLastMsg = Date.now() - (lastMsg.createdAt || 0);
+      if (timeSinceLastMsg > 10 * 60 * 1000 && Math.random() < 0.1) {
+        const otherMemberIds = currentGroup.memberIds.filter(id => id !== 'user');
+        if (otherMemberIds.length === 0) return;
+
+        const randomMemberId = otherMemberIds[Math.floor(Math.random() * otherMemberIds.length)];
+        const persona = personas.find(p => p.id === randomMemberId);
+        if (!persona) return;
+
+        const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, []);
+        if (isOffline) return;
+
+        const contextMessages = messagesRef.current
+          .filter(m => m.groupId === currentGroupId && !m.hidden)
+          .slice(-10)
+          .map(m => {
+            let role = (m.role === 'model' && m.personaId === persona.id) ? 'assistant' : 'user';
+            let content = m.text;
+            if (m.role === 'model') {
+              const sender = personas.find(p => p.id === m.personaId);
+              content = `[${sender?.name || '未知'}]: ${content}`;
+            } else {
+              content = `[用户]: ${content}`;
+            }
+            return { role, content };
+          });
+
+        const crossContextMemory = getCrossContextMemory(persona.id, currentGroupId);
+
+        const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。群里已经安静了一段时间了。
+你是群成员之一：${persona.name}。
+人设：${persona.instructions}${crossContextMemory}
+
+请根据你的性格以及【世界书】的全局规则，决定你现在是否要主动在群里找大家聊天、分享事情或者抛出一个新话题。
+- 如果你想主动说话，请直接输出你的发言内容。
+- 如果你觉得现在不想说话，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。
+- 必须严格遵守【世界书】中的全局设定，无论是在对话风格还是行为准则上。]`;
+
+        try {
+          const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
+          
+          if (!response.responseText.includes('[NO_REPLY]')) {
+            const isSegment = persona.isSegmentResponse || worldbook.forceSegmentResponse;
+            const texts = isSegment ? response.responseText.split(/[\n\r]+|\\n/).filter(t => t.trim()) : [response.responseText];
+
+            (async () => {
+              for (let i = 0; i < texts.length; i++) {
+                const text = texts[i].replace('[NO_REPLY]', '').trim();
+                if (!text) continue;
+                
+                setIsTyping(true);
+                await new Promise(r => setTimeout(r, 1000 + text.length * 30));
+                setIsTyping(false);
+
+                const aiMsg: Message = {
+                  id: (Date.now() + Math.random() + i).toString(),
+                  personaId: persona.id,
+                  groupId: currentGroupId,
+                  role: 'model',
+                  text: text,
+                  msgType: 'text',
+                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                  isRead: false,
+                  createdAt: Date.now(),
+                };
+                
+                setMessages(prev => [...prev, aiMsg]);
+
+                if (i < texts.length - 1) {
+                  await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+                }
+              }
+            })();
+          }
+        } catch (e) {
+          console.error("Group idle starter error:", e);
+        }
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [currentGroupId, isActive, groups, personas, apiSettings, worldbook, userProfile]);
   // Group chat idle conversation starter
   useEffect(() => {
     if (!currentGroupId || !isActive || apiSettings.isProactiveMessagingEnabled === false) return;
@@ -324,14 +417,16 @@ export function ChatScreen({
 
         const crossContextMemory = getCrossContextMemory(persona.id, currentGroupId);
 
-        const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。群里已经安静了一段时间了。
+       const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。以上是群聊记录。
 你是群成员之一：${persona.name}。
 人设：${persona.instructions}${crossContextMemory}
+${isOffline ? '【特殊提示】你当前处于“离线”状态，但有人在群里@了你。请根据你的人设决定是继续保持沉默、发个自动回复、还是被吵醒并回复。' : ''}
 
-请根据你的性格，决定你现在是否要主动在群里找大家聊天、分享事情或者抛出一个新话题。
-- 如果你想主动说话，请直接输出你的发言内容。
-- 如果你觉得现在不想说话，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。]`;
+请根据你的性格、当前聊天氛围、最后一条消息的内容以及【世界书】中的全局规则，决定你现在是否要发言。
+${isMentioned ? '- 有人@了你，或者明确向你提问，请务必直接输出你的回复内容，不要保持沉默。' : '- 如果你觉得有话想说（比如接话、吐槽、回答问题、或者主动挑起话题），请直接输出你的回复内容。\n- 如果你觉得现在不需要你说话，或者你想保持沉默，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。'}
+${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理人）决定连看都不看这条消息，请输出 [UNREAD]。这会让消息保持“未读”状态。' : ''}
 
+⚠️注意：【世界书】中的全局规则具有最高优先级。如果规则规定在某些情况下不应回复或有特定的回复风格，请务必遵守。不要每次都回复，要像真人一样自然。群里还有其他人，你可以和他们互动。]`;
         try {
           const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
           
