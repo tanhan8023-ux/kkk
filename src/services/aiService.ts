@@ -445,9 +445,9 @@ function sanitizeContent(text: string): string {
   cleaned = cleaned.replace(/\[STICKER:\s*data:[^\]]+\]/g, '[STICKER: image]');
 
   // 3. Truncate extremely long text that might still remain (e.g. malformed base64)
-  // 30,000 chars is plenty for a conversation turn, but small enough to avoid some limits.
-  if (cleaned.length > 30000) {
-    cleaned = cleaned.substring(0, 30000) + '...[TRUNCATED]';
+  // 5,000 chars is plenty for a conversation turn, but small enough to avoid some limits.
+  if (cleaned.length > 5000) {
+    cleaned = cleaned.substring(0, 5000) + '...[TRUNCATED]';
   }
 
   return cleaned.trim();
@@ -753,11 +753,30 @@ export async function fetchAiResponse(
     ? `【长期记忆】\n你对用户的偏好和过去的对话有以下记忆：\n- 偏好：${memories.preferences.join(', ')}\n- 过去对话摘要：${memories.pastContext.join('; ')}\n请在对话中体现出你对这些信息的了解，进行个性化回应。`
     : "";
 
-  const jailbreakPrompts = [worldbook.jailbreakPrompt, ...(worldbook.jailbreakPrompts || [])].filter(Boolean);
-  const globalPrompts = [worldbook.globalPrompt, ...(worldbook.globalPrompts || [])].filter(Boolean);
-  const personaPrompts = [persona.prompt, ...(persona.prompts || [])].filter(Boolean);
+  const truncatePromptList = (prompts: string[], maxTotalChars: number) => {
+    let currentTotal = 0;
+    const result: string[] = [];
+    for (const p of prompts) {
+      if (currentTotal + p.length > maxTotalChars) {
+        const remaining = maxTotalChars - currentTotal;
+        if (remaining > 100) {
+          result.push(p.substring(0, remaining) + "...");
+        }
+        break;
+      }
+      result.push(p);
+      currentTotal += p.length;
+    }
+    return result;
+  };
+
+  const jailbreakPrompts = truncatePromptList([worldbook.jailbreakPrompt, ...(worldbook.jailbreakPrompts || [])].filter(Boolean), 2000);
+  const globalPrompts = truncatePromptList([worldbook.globalPrompt, ...(worldbook.globalPrompts || [])].filter(Boolean), 2000);
+  const personaPrompts = truncatePromptList([persona.prompt, ...(persona.prompts || [])].filter(Boolean), 1500);
 
   const fullSystemInstruction = isSystemTask ? [
+    ...jailbreakPrompts,
+    ...globalPrompts,
     persona.instructions ? `【角色人设】\n${persona.instructions}` : "",
     ...personaPrompts,
     additionalSystemInstructions
@@ -919,6 +938,7 @@ export async function fetchAiResponse(
             messages: openAiMessages,
             temperature: effectiveApiSettings.temperature,
             seed: Math.floor(Math.random() * 1000000),
+            max_tokens: 4096,
           })
         });
 
