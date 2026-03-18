@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Navigation, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, ArrowLeftRight, MessageCircle, Compass, Navigation, Bookmark, Image as ImageIcon, MoreHorizontal, MessageSquare, Heart, Camera, UserPlus, Trash2, Ban, Users, Play, RefreshCw, Wallet, X, CreditCard, Smile, Music, Film, Moon, Shield, RotateCcw, Settings, Sliders, Phone, Mic, MicOff, Video, VideoOff, User, Smartphone, Scan, PiggyBank, Car, HeartPulse, Check } from 'lucide-react';
 import { Message, Persona, UserProfile, ApiSettings, ThemeSettings, Moment, Comment, WorldbookSettings, Transaction, Screen, GroupChat } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { AnimatePresence, motion } from 'motion/react';
@@ -63,6 +63,8 @@ interface Props {
   aiRef: React.MutableRefObject<GoogleGenAI | null>;
   setAiPhoneRequest: (request: {msgId: string, personaId: string} | null) => void;
   setPhoneResponseHandler: (handler: ((msgId: string, accept: boolean) => void) | null) => void;
+  onDissolveGroup?: (id: string) => void;
+  onAddGroupMembers?: (groupId: string, memberIds: string[]) => void;
 }
 
 import localforage from 'localforage';
@@ -97,7 +99,9 @@ export function ChatScreen({
   onAiPhoneToggle,
   aiRef,
   setAiPhoneRequest,
-  setPhoneResponseHandler
+  setPhoneResponseHandler,
+  onDissolveGroup,
+  onAddGroupMembers
 }: Props) {
   const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'moments' | 'favorites' | 'theater'>('chat');
   const [showWallet, setShowWallet] = useState(false);
@@ -121,6 +125,9 @@ export function ChatScreen({
   const [newStickerName, setNewStickerName] = useState('');
   const [newStickerUrl, setNewStickerUrl] = useState('');
   const [showChatSettings, setShowChatSettings] = useState(false);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [showAddGroupMember, setShowAddGroupMember] = useState(false);
+  const [selectedNewMembers, setSelectedNewMembers] = useState<string[]>([]);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<string | null>(null);
   const [showAiPhone, setShowAiPhone] = useState(false);
@@ -332,21 +339,37 @@ export function ChatScreen({
             const isSegment = persona.isSegmentResponse || worldbook.forceSegmentResponse;
             const texts = isSegment ? response.responseText.split(/[\n\r]+|\\n/).filter(t => t.trim()) : [response.responseText];
 
-            texts.forEach((text, index) => {
-              const aiMsg: Message = {
-                id: (Date.now() + Math.random() + index).toString(),
-                personaId: persona.id,
-                groupId: currentGroupId,
-                role: 'model',
-                text: text.replace('[NO_REPLY]', '').trim(),
-                msgType: 'text',
-                timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-                isRead: false,
-                createdAt: Date.now() + 500 + (index * 1000),
-              };
-              
-              setMessages(prev => [...prev, aiMsg]);
-            });
+            // Send segments one by one with real delay to allow interleaving
+            (async () => {
+              for (let i = 0; i < texts.length; i++) {
+                const text = texts[i].replace('[NO_REPLY]', '').trim();
+                if (!text) continue;
+                
+                // Simulate typing
+                setIsTyping(true);
+                await new Promise(r => setTimeout(r, 1000 + text.length * 30));
+                setIsTyping(false);
+
+                const aiMsg: Message = {
+                  id: (Date.now() + Math.random() + i).toString(),
+                  personaId: persona.id,
+                  groupId: currentGroupId,
+                  role: 'model',
+                  text: text,
+                  msgType: 'text',
+                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                  isRead: false,
+                  createdAt: Date.now(),
+                };
+                
+                setMessages(prev => [...prev, aiMsg]);
+
+                // Wait between segments
+                if (i < texts.length - 1) {
+                  await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+                }
+              }
+            })();
           }
         } catch (e) {
           console.error("Group idle starter error:", e);
@@ -378,8 +401,12 @@ export function ChatScreen({
 
     // Wait a random amount of time (2-5 seconds) before deciding to reply
     const timer = setTimeout(async () => {
-      // Check if another message was sent while waiting
-      if (messagesRef.current[messagesRef.current.length - 1].id !== lastMsg.id) return;
+      const currentMessages = messagesRef.current;
+      const latestMsg = currentMessages[currentMessages.length - 1];
+      
+      // Relaxed check: allow replying even if a few messages were sent, 
+      // as long as we haven't replied to this specific thread yet.
+      if (latestMsg.groupId !== currentGroupId) return;
 
       const otherMemberIds = currentGroup.memberIds.filter(id => id !== 'user');
       if (otherMemberIds.length === 0) return;
@@ -387,7 +414,13 @@ export function ChatScreen({
       // Shuffle members to give everyone a fair chance
       const shuffledMembers = [...otherMemberIds].sort(() => Math.random() - 0.5);
 
+      // Chance for multiple people to reply (cross-talk)
+      let replyCount = 0;
+      const maxReplies = Math.random() > 0.7 ? 2 : 1; // 30% chance for 2 people to reply
+
       for (const memberId of shuffledMembers) {
+        if (replyCount >= maxReplies) break;
+
         // Don't let the person who just spoke reply to themselves immediately
         if (memberId === lastMsg.personaId) continue;
 
@@ -447,13 +480,12 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
           const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
           
           // Check if another message was sent while we were generating
-          // If mentioned, we should still try to reply unless the new message is also a mention for us
           const latestMsg = messagesRef.current[messagesRef.current.length - 1];
-          if (latestMsg.id !== lastMsg.id && !isMentioned) {
-            break; // Abort this evaluation, the new message will trigger a new one
+          // Relaxed check for interleaving: only abort if the latest message is from the SAME persona
+          if (latestMsg.id !== lastMsg.id && !isMentioned && latestMsg.personaId === persona.id) {
+            break; 
           }
           
-          // If mentioned but a newer message also mentions us, we might want to skip this one and reply to the latest
           if (isMentioned && latestMsg.id !== lastMsg.id && latestMsg.text.includes(`@${persona.name}`)) {
             break;
           }
@@ -478,25 +510,45 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
             }
 
             if (responseText) {
+              replyCount++;
               const isSegment = persona.isSegmentResponse || worldbook.forceSegmentResponse;
               const texts = isSegment ? responseText.split(/[\n\r]+|\\n/).filter(t => t.trim()) : [responseText];
 
-              texts.forEach((text, index) => {
-                const aiMsg: Message = {
-                  id: (Date.now() + Math.random() + index).toString(),
-                  personaId: persona.id,
-                  groupId: currentGroupId,
-                  role: 'model',
-                  text: text,
-                  msgType: 'text',
-                  timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-                  isRead: false,
-                  createdAt: Date.now() + 500 + (index * 1000),
-                };
-                
-                setMessages(prev => [...prev, aiMsg]);
-              });
-              break; // Only one persona replies at a time
+              // Send segments one by one with real delay to allow interleaving
+              (async () => {
+                for (let i = 0; i < texts.length; i++) {
+                  const text = texts[i];
+                  
+                  // Simulate typing
+                  setIsTyping(true);
+                  await new Promise(r => setTimeout(r, 1000 + text.length * 30));
+                  setIsTyping(false);
+
+                  const aiMsg: Message = {
+                    id: (Date.now() + Math.random() + i).toString(),
+                    personaId: persona.id,
+                    groupId: currentGroupId,
+                    role: 'model',
+                    text: text,
+                    msgType: 'text',
+                    timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                    isRead: false,
+                    createdAt: Date.now(),
+                  };
+                  
+                  setMessages(prev => [...prev, aiMsg]);
+
+                  // Wait between segments
+                  if (i < texts.length - 1) {
+                    await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+                  }
+                }
+              })();
+              
+              // If multiple people are replying, add a delay before the next person starts
+              if (replyCount < maxReplies) {
+                await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+              }
             }
           }
         } catch (e) {
@@ -506,7 +558,7 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
     }, Math.random() * 3000 + 2000);
 
     return () => clearTimeout(timer);
-  }, [messages, currentGroupId, isActive, isTyping, groups, personas, apiSettings, worldbook, userProfile]);
+  }, [messages, currentGroupId, isActive, groups, personas, apiSettings, worldbook, userProfile]);
 
   const handleUnreadReaction = async (persona: Persona, lastMsgId: string) => {
     // Double check state hasn't changed
@@ -2530,6 +2582,15 @@ ${recentMessages}
             </div>
           )}
         </div>
+
+        {activeTab === 'chat' && currentGroupId && (
+          <button 
+            onClick={() => setShowGroupSettings(true)} 
+            className="p-2 text-neutral-800 z-50"
+          >
+            <MoreHorizontal size={24} />
+          </button>
+        )}
 
         {activeTab === 'chat' && !currentChatId && !currentGroupId && (
           <div className="flex items-center gap-1 z-50">
@@ -5977,6 +6038,150 @@ ${recentMessages}
           />
         </div>
       )}
+
+      {/* Group Settings Modal */}
+      <AnimatePresence>
+        {showGroupSettings && currentGroup && (
+          <motion.div
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            transition={{ duration: 0.3, type: 'spring', bounce: 0 }}
+            className="fixed inset-0 z-[150] bg-neutral-100 flex flex-col"
+          >
+            <div className={`bg-white px-4 pb-4 flex items-center justify-between border-b border-neutral-100 ${theme.showStatusBar !== false ? 'pt-12' : 'pt-8'}`}>
+              <button onClick={() => setShowGroupSettings(false)} className="p-2 -ml-2 text-neutral-800 active:opacity-60">
+                <ChevronLeft size={24} />
+              </button>
+              <h1 className="text-[17px] font-bold text-neutral-900">聊天信息({currentGroup.memberIds.length})</h1>
+              <div className="w-10" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto bg-white">
+              {/* Member Grid */}
+              <div className="p-4 grid grid-cols-5 gap-4">
+                {currentGroup.memberIds.map(mid => {
+                  const isUser = mid === 'user';
+                  const p = personas.find(pers => pers.id === mid);
+                  return (
+                    <div key={mid} className="flex flex-col items-center gap-1">
+                      <img 
+                        src={isUser ? (userProfile.avatarUrl || defaultUserAvatar) : (p?.avatarUrl || defaultAiAvatar)} 
+                        className="w-12 h-12 rounded-xl object-cover border border-neutral-100"
+                        alt="member"
+                      />
+                      <span className="text-[10px] text-neutral-500 truncate w-full text-center">
+                        {isUser ? (userProfile.name || '我') : (p?.name || 'AI')}
+                      </span>
+                    </div>
+                  );
+                })}
+                <button 
+                  onClick={() => setShowAddGroupMember(true)}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <div className="w-12 h-12 rounded-xl border-2 border-dashed border-neutral-200 flex items-center justify-center text-neutral-400 active:bg-neutral-50">
+                    <Plus size={24} />
+                  </div>
+                  <span className="text-[10px] text-neutral-500">添加</span>
+                </button>
+              </div>
+
+              <div className="h-2 bg-neutral-100" />
+
+              <div className="p-4 space-y-4">
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-neutral-800">群聊名称</span>
+                  <span className="text-neutral-400 text-sm">{currentGroup.name}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-neutral-800">查找聊天记录</span>
+                  <ChevronLeft size={16} className="rotate-180 text-neutral-300" />
+                </div>
+              </div>
+
+              <div className="h-2 bg-neutral-100" />
+
+              <div className="p-4">
+                <button 
+                  onClick={() => {
+                    if (window.confirm('确定要解散该群聊吗？所有聊天记录将被删除。')) {
+                      onDissolveGroup?.(currentGroup.id);
+                      setShowGroupSettings(false);
+                    }
+                  }}
+                  className="w-full py-3 bg-red-50 text-red-500 font-medium rounded-xl active:bg-red-100 transition-colors"
+                >
+                  解散群聊
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Group Member Modal */}
+      <AnimatePresence>
+        {showAddGroupMember && (
+          <motion.div
+            initial={{ opacity: 0, y: '100%' }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: '100%' }}
+            className="fixed inset-0 z-[200] bg-black/60 flex items-end"
+            onClick={() => setShowAddGroupMember(false)}
+          >
+            <motion.div
+              className="w-full bg-white rounded-t-3xl max-h-[80vh] flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
+                <button onClick={() => setShowAddGroupMember(false)} className="text-neutral-500">取消</button>
+                <h2 className="font-bold text-neutral-900">选择联系人</h2>
+                <button 
+                  onClick={() => {
+                    if (selectedNewMembers.length > 0 && currentGroupId) {
+                      onAddGroupMembers?.(currentGroupId, selectedNewMembers);
+                      setShowAddGroupMember(false);
+                      setSelectedNewMembers([]);
+                    }
+                  }}
+                  disabled={selectedNewMembers.length === 0}
+                  className={`font-bold ${selectedNewMembers.length > 0 ? 'text-[#07c160]' : 'text-neutral-300'}`}
+                >
+                  确定({selectedNewMembers.length})
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2">
+                  {personas
+                    .filter(p => !currentGroup?.memberIds.includes(p.id))
+                    .map(p => (
+                      <div 
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedNewMembers(prev => 
+                            prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]
+                          );
+                        }}
+                        className="flex items-center gap-3 p-2 active:bg-neutral-50 rounded-xl cursor-pointer"
+                      >
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedNewMembers.includes(p.id) ? 'bg-[#07c160] border-[#07c160]' : 'border-neutral-200'}`}>
+                          {selectedNewMembers.includes(p.id) && <Check size={12} className="text-white" />}
+                        </div>
+                        <img src={p.avatarUrl || defaultAiAvatar} className="w-10 h-10 rounded-xl object-cover" alt="avatar" />
+                        <span className="text-neutral-800 font-medium">{p.name}</span>
+                      </div>
+                    ))}
+                  {personas.filter(p => !currentGroup?.memberIds.includes(p.id)).length === 0 && (
+                    <div className="text-center py-8 text-neutral-400">没有更多可添加的联系人</div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1409,6 +1409,26 @@ export default function App() {
     setCurrentChatId(null);
   };
 
+  const handleDissolveGroup = (groupId: string) => {
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setMessages(prev => prev.filter(m => m.groupId !== groupId));
+    if (currentGroupId === groupId) {
+      setCurrentGroupId(null);
+    }
+  };
+
+  const handleAddGroupMembers = (groupId: string, memberIds: string[]) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          memberIds: Array.from(new Set([...g.memberIds, ...memberIds]))
+        };
+      }
+      return g;
+    }));
+  };
+
   const handleSendMessage = React.useCallback(async (text: string, personaId: string) => {
     
     const targetPersona = personas.find(p => p.id === personaId);
@@ -2589,6 +2609,8 @@ export default function App() {
                     currentGroupId={currentGroupId}
                     setCurrentGroupId={setCurrentGroupId}
                     onCreateGroup={handleCreateGroup}
+                    onDissolveGroup={handleDissolveGroup}
+                    onAddGroupMembers={handleAddGroupMembers}
                     onNavigate={(screen, params) => {
                       setCurrentScreen(screen);
                       if (screen === 'music' && params?.personaId) {
