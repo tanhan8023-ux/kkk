@@ -30,7 +30,7 @@ const ChatBubbleWrapper = React.memo(({
   setListeningWithPersonaId
 }: any) => {
   const chatMessages = React.useMemo(() => {
-    return messages.filter((m: any) => m.personaId === listeningWith.id && !m.theaterId);
+    return messages.filter((m: any) => m.personaId === listeningWith.id && !m.groupId && !m.theaterId);
   }, [messages, listeningWith.id]);
 
   const onSend = React.useCallback((text: string) => {
@@ -893,10 +893,10 @@ export default function App() {
   useEffect(() => {
     if (currentScreen === 'chat' && currentChatId && !isLocked) {
       setMessages(prev => {
-        const hasUnread = prev.some(m => m.personaId === currentChatId && m.role === 'model' && !m.isRead);
+        const hasUnread = prev.some(m => m.personaId === currentChatId && !m.groupId && m.role === 'model' && !m.isRead);
         if (hasUnread) {
           return prev.map(m => 
-            m.personaId === currentChatId && m.role === 'model' && !m.isRead 
+            m.personaId === currentChatId && !m.groupId && m.role === 'model' && !m.isRead 
               ? { ...m, isRead: true } 
               : m
           );
@@ -905,7 +905,21 @@ export default function App() {
       });
       setUnreadCount(0);
     }
-  }, [currentScreen, currentChatId, isLocked]);
+    if (currentScreen === 'chat' && currentGroupId && !isLocked) {
+      setMessages(prev => {
+        const hasUnread = prev.some(m => m.groupId === currentGroupId && m.role === 'model' && !m.isRead);
+        if (hasUnread) {
+          return prev.map(m => 
+            m.groupId === currentGroupId && m.role === 'model' && !m.isRead 
+              ? { ...m, isRead: true } 
+              : m
+          );
+        }
+        return prev;
+      });
+      setUnreadCount(0);
+    }
+  }, [currentScreen, currentChatId, currentGroupId, isLocked]);
 
   // Silence Detection (Read but no reply)
   useEffect(() => {
@@ -960,7 +974,7 @@ export default function App() {
       
       try {
         const contextMessages = messages
-          .filter(m => m.personaId === targetPersona!.id)
+          .filter(m => m.personaId === targetPersona!.id && !m.groupId)
           .slice(-10)
           .map(m => ({
             role: m.role === 'model' ? 'assistant' : 'user',
@@ -1472,7 +1486,7 @@ export default function App() {
     if (targetPersona) {
       try {
         const contextMessages = messages
-          .filter(m => m.personaId === personaId)
+          .filter(m => m.personaId === personaId && !m.groupId)
           .slice(-10)
           .map(m => ({
             role: m.role === 'model' ? 'assistant' : 'user',
@@ -1517,7 +1531,7 @@ export default function App() {
 
     try {
       const contextMessages = messages
-        .filter(m => m.personaId === personaId)
+        .filter(m => m.personaId === personaId && !m.groupId)
         .slice(-10)
         .filter(m => m.text && m.text.trim() !== '')
         .map(m => ({
@@ -1692,7 +1706,7 @@ export default function App() {
     if (targetPersona.isBlockedByUser || targetPersona.hasBlockedUser) return;
     try {
       const { messages, apiSettings, worldbook, userProfile } = stateRef.current;
-      const history = messages.filter(m => m.personaId === targetPersona.id);
+      const history = messages.filter(m => m.personaId === targetPersona.id && !m.groupId);
       const contextMessages = history.map(m => ({
         role: m.role === 'model' ? 'assistant' : 'user',
         content: `[ID: ${m.id}] ${m.text}`
@@ -1723,7 +1737,7 @@ export default function App() {
       setMessages(prev => {
         // Mark previous user messages as read
         const updated = prev.map(m => 
-          m.personaId === targetPersona.id && m.role === 'user' ? { ...m, isRead: true } : m
+          m.personaId === targetPersona.id && !m.groupId && m.role === 'user' ? { ...m, isRead: true } : m
         );
         return [...updated, aiMsg];
       });
@@ -1749,7 +1763,7 @@ export default function App() {
     if (currentLastMsg.id !== lastMsgId) return; // User replied or new msg came in
 
     const { apiSettings, worldbook, userProfile } = stateRef.current;
-    const history = currentMessages.filter(m => m.personaId === persona.id);
+    const history = currentMessages.filter(m => m.personaId === persona.id && !m.groupId);
     const contextMessages = history.map(m => ({
       role: m.role === 'model' ? 'assistant' : 'user',
       content: `[ID: ${m.id}] ${m.text}`
@@ -1928,7 +1942,7 @@ export default function App() {
     // Trigger AI response
     try {
        // We need history
-       const history = messages.filter(m => m.personaId === targetPersona.id);
+       const history = messages.filter(m => m.personaId === targetPersona.id && !m.groupId);
        const contextMessages = history.map(m => ({
           role: m.role === 'model' ? 'assistant' : 'user',
           content: `[ID: ${m.id}] ${m.text}`
@@ -1958,7 +1972,7 @@ export default function App() {
        };
        setMessages(prev => {
          const updated = prev.map(m => 
-           m.personaId === targetPersona.id && m.role === 'user' ? { ...m, isRead: true } : m
+           m.personaId === targetPersona.id && !m.groupId && m.role === 'user' ? { ...m, isRead: true } : m
          );
          return [...updated, aiMsg];
        });

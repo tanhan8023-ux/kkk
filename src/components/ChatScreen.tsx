@@ -225,6 +225,192 @@ export function ChatScreen({
     }
   }, [currentChatId, personas, messages]);
 
+  // Group chat idle conversation starter
+  useEffect(() => {
+    if (!currentGroupId || !isActive) return;
+    
+    const currentGroup = groups.find(g => g.id === currentGroupId);
+    if (!currentGroup) return;
+
+    const intervalId = setInterval(async () => {
+      const lastMsg = messagesRef.current.filter(m => m.groupId === currentGroupId).pop();
+      if (!lastMsg) return;
+
+      // If the last message was sent more than 5 minutes ago, there's a small chance to start a new topic
+      const timeSinceLastMsg = Date.now() - (lastMsg.createdAt || 0);
+      if (timeSinceLastMsg > 5 * 60 * 1000 && Math.random() < 0.1) { // 10% chance every minute
+        const otherMemberIds = currentGroup.memberIds.filter(id => id !== 'user');
+        if (otherMemberIds.length === 0) return;
+
+        const randomMemberId = otherMemberIds[Math.floor(Math.random() * otherMemberIds.length)];
+        const persona = personas.find(p => p.id === randomMemberId);
+        if (!persona) return;
+
+        const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, []);
+        if (isOffline) return;
+
+        const contextMessages = messagesRef.current
+          .filter(m => m.groupId === currentGroupId && !m.hidden)
+          .slice(-10)
+          .map(m => {
+            let role = m.role === 'model' ? 'assistant' : 'user';
+            let content = m.text;
+            if (m.role === 'model') {
+              const sender = personas.find(p => p.id === m.personaId);
+              content = `[${sender?.name || '未知'}]: ${content}`;
+            } else {
+              content = `[用户]: ${content}`;
+            }
+            return { role, content };
+          });
+
+        const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。群里已经安静了一段时间了。
+你是群成员之一：${persona.name}。
+人设：${persona.instructions}
+
+请根据你的性格，决定你现在是否要主动在群里找大家聊天、分享事情或者抛出一个新话题。
+- 如果你想主动说话，请直接输出你的发言内容。
+- 如果你觉得现在不想说话，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。]`;
+
+        try {
+          const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
+          
+          if (!response.responseText.includes('[NO_REPLY]')) {
+            const texts = persona.isSegmentResponse ? response.responseText.split('\\n').filter(t => t.trim()) : [response.responseText];
+
+            texts.forEach((text, index) => {
+              const aiMsg: Message = {
+                id: (Date.now() + Math.random() + index).toString(),
+                personaId: persona.id,
+                groupId: currentGroupId,
+                role: 'model',
+                text: text.replace('[NO_REPLY]', '').trim(),
+                msgType: 'text',
+                timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                isRead: false,
+                createdAt: Date.now() + 500 + (index * 1000),
+              };
+              
+              setMessages(prev => [...prev, aiMsg]);
+            });
+          }
+        } catch (e) {
+          console.error("Group idle starter error:", e);
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(intervalId);
+  }, [currentGroupId, isActive, groups, personas, apiSettings, worldbook, userProfile]);
+
+  // Group chat spontaneous reply logic
+  useEffect(() => {
+    if (!currentGroupId || !isActive) return;
+    
+    const currentGroup = groups.find(g => g.id === currentGroupId);
+    if (!currentGroup) return;
+
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.groupId !== currentGroupId) return;
+
+    // Don't evaluate the same message multiple times
+    if (lastEvaluatedGroupMsgId.current === lastMsg.id) return;
+
+    // Don't trigger if someone is already typing
+    if (isTyping) return;
+
+    // Only trigger if the last message was sent recently (e.g., within 1 minute)
+    if (Date.now() - (lastMsg.createdAt || 0) > 60000) return;
+
+    // Mark this message as evaluated so we don't re-trigger on other state changes
+    lastEvaluatedGroupMsgId.current = lastMsg.id;
+
+    // Wait a random amount of time (2-5 seconds) before deciding to reply
+    const timer = setTimeout(async () => {
+      // Check if another message was sent while waiting
+      if (messagesRef.current[messagesRef.current.length - 1].id !== lastMsg.id) return;
+
+      const otherMemberIds = currentGroup.memberIds.filter(id => id !== 'user');
+      if (otherMemberIds.length === 0) return;
+
+      // Shuffle members to give everyone a fair chance
+      const shuffledMembers = [...otherMemberIds].sort(() => Math.random() - 0.5);
+
+      for (const memberId of shuffledMembers) {
+        // Don't let the person who just spoke reply to themselves immediately
+        if (memberId === lastMsg.personaId) continue;
+
+        const persona = personas.find(p => p.id === memberId);
+        if (!persona) continue;
+
+        // Check if offline
+        const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, []);
+        if (isOffline) continue;
+
+        // Ask this persona if they want to reply
+        const contextMessages = messagesRef.current
+          .filter(m => m.groupId === currentGroupId && !m.hidden)
+          .slice(-15)
+          .map(m => {
+            let role = m.role === 'model' ? 'assistant' : 'user';
+            let content = m.text;
+            if (m.role === 'model') {
+              const sender = personas.find(p => p.id === m.personaId);
+              content = `[${sender?.name || '未知'}]: ${content}`;
+            } else {
+              content = `[用户]: ${content}`;
+            }
+            return { role, content };
+          });
+
+        const prompt = `[系统提示：这是一个名为"${currentGroup.name}"的群聊。以上是群聊记录。
+你是群成员之一：${persona.name}。
+人设：${persona.instructions}
+
+请根据你的性格、当前聊天氛围以及最后一条消息的内容，决定你现在是否要发言。
+- 如果你觉得有话想说（比如接话、吐槽、回答问题、或者主动挑起话题），请直接输出你的回复内容。
+- 如果你觉得现在不需要你说话，或者你想保持沉默，请务必只输出 [NO_REPLY] 这几个字，不要输出任何其他内容。
+注意：不要每次都回复，要像真人一样自然。群里还有其他人，你可以和他们互动。]`;
+
+        try {
+          // Use a fast model for this check
+          const response = await fetchAiResponse(prompt, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef, true, "", apiSettings.apiUrl ? undefined : "gemini-3-flash-preview");
+          
+          // Check if another message was sent while we were generating
+          if (messagesRef.current[messagesRef.current.length - 1].id !== lastMsg.id) {
+            break; // Abort this evaluation, the new message will trigger a new one
+          }
+
+          if (!response.responseText.includes('[NO_REPLY]')) {
+            // This persona decided to reply!
+            const texts = persona.isSegmentResponse ? response.responseText.split('\\n').filter(t => t.trim()) : [response.responseText];
+
+            texts.forEach((text, index) => {
+              const aiMsg: Message = {
+                id: (Date.now() + Math.random() + index).toString(),
+                personaId: persona.id,
+                groupId: currentGroupId,
+                role: 'model',
+                text: text.replace('[NO_REPLY]', '').trim(),
+                msgType: 'text',
+                timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+                isRead: false,
+                createdAt: Date.now() + 500 + (index * 1000),
+              };
+              
+              setMessages(prev => [...prev, aiMsg]);
+            });
+            break; // Only one persona replies at a time
+          }
+        } catch (e) {
+          console.error("Group spontaneous reply error:", e);
+        }
+      }
+    }, Math.random() * 3000 + 2000);
+
+    return () => clearTimeout(timer);
+  }, [messages, currentGroupId, isActive, isTyping, groups, personas, apiSettings, worldbook, userProfile]);
+
   const handleUnreadReaction = async (persona: Persona, lastMsgId: string) => {
     // Double check state hasn't changed
     const currentLastMsg = messages[messages.length - 1];
@@ -449,6 +635,7 @@ export function ChatScreen({
 
   const [isVoiceChatActive, setIsVoiceChatActive] = useState(false);
   const lastAutonomousPostTime = useRef<number>(0);
+  const lastEvaluatedGroupMsgId = useRef<string | null>(null);
 
   // Autonomous posting logic
   useEffect(() => {
@@ -643,7 +830,7 @@ export function ChatScreen({
     if (activeTheaterScript) {
       return theaterMessages;
     }
-    return messages.filter(m => m.personaId === currentChatId && !m.theaterId && !m.hidden);
+    return messages.filter(m => m.personaId === currentChatId && !m.groupId && !m.theaterId && !m.hidden);
   }, [messages, currentChatId, currentGroupId, activeTheaterScript, theaterMessages]);
 
   // Inject custom CSS into a style tag for better compatibility and power
@@ -1128,19 +1315,9 @@ export function ChatScreen({
     setQuotedMessage(null);
     setShowPlusMenu(false);
     
-    // AI response logic for group chat
+    // AI response logic for group chat is now handled by the spontaneous reply useEffect
     if (currentGroup && !theaterId) {
-      // For now, let's pick one random member of the group to reply
-      const otherMemberIds = currentGroup?.memberIds.filter(id => id !== 'user') || [];
-      if (otherMemberIds.length > 0) {
-        const randomMemberId = otherMemberIds[Math.floor(Math.random() * otherMemberIds.length)];
-        const randomPersona = personas.find(p => p.id === randomMemberId);
-        if (randomPersona) {
-          // Trigger AI response for this persona in the group
-          triggerAiResponse(text, randomPersona, true, userMsg.id);
-        }
-      }
-      return; // Added return to prevent fall-through
+      return; // Added return to prevent fall-through to 1-on-1 logic
     }
 
     if (!currentPersona) return;
@@ -1225,7 +1402,7 @@ export function ChatScreen({
         }
 
         // Get the latest messages for context (including the ones sent during debounce)
-        let latestMessages = messagesRef.current.filter(m => m.personaId === personaForResponse.id && m.theaterId === theaterId).slice(-50); // Limit context size
+        let latestMessages = messagesRef.current.filter(m => m.personaId === personaForResponse.id && !m.groupId && m.theaterId === theaterId).slice(-50); // Limit context size
         
         // If we are responding to an image, we'll pass it directly to fetchAiResponse in the prompt turn
         // to ensure the AI associates the system prompt with the image correctly.
@@ -1390,7 +1567,7 @@ export function ChatScreen({
                 setIsTyping(pendingRequests.current > 0);
                 
                 try {
-                  const currentLatestMessages = messagesRef.current.filter(m => m.personaId === currentPersona.id).slice(-200);
+                  const currentLatestMessages = messagesRef.current.filter(m => m.personaId === currentPersona.id && !m.groupId).slice(-200);
                   const recallPrompt = processed.shouldRecall 
                     ? `[系统提示：你（AI角色）刚才撤回了你发出的上一条消息。请发一条新消息，可以解释一下为什么撤回（比如害羞了、说错话了、发错表情了等），然后继续聊天。语气要自然。]`
                     : `[系统提示：你（AI角色）刚才撤回了你发出的上一条消息。请发一条新消息，可以解释一下为什么撤回（比如打错字了、发错表情了等），然后继续聊天。]`;
@@ -1484,57 +1661,6 @@ export function ChatScreen({
     setTimeout(() => {
       setMessages(prev => prev.map(m => m.id === userMsg.id && m.status === 'sent' ? { ...m, status: 'delivered' } : m));
     }, 600);
-  };
-
-  const triggerAiResponse = async (userText: string, persona: Persona, isGroup: boolean = false, userMsgId?: string) => {
-    pendingRequests.current += 1;
-    setIsTyping(pendingRequests.current > 0);
-
-    if (isGroup && userMsgId) {
-      setMessages(prev => prev.map(m => m.id === userMsgId ? { ...m, readBy: Array.from(new Set([...(m.readBy || []), persona.id])) } : m));
-    }
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000));
-      
-      const contextMessages = messages
-        .filter(m => (isGroup ? m.groupId === currentGroupId : m.personaId === persona.id) && !m.hidden)
-        .slice(-15)
-        .map(m => {
-          let role = m.role === 'model' ? 'assistant' : 'user';
-          let content = m.text;
-          if (isGroup && m.role === 'model') {
-            const sender = personas.find(p => p.id === m.personaId);
-            content = `[${sender?.name || '未知'}]: ${content}`;
-          }
-          return { role, content };
-        });
-
-      const response = await fetchAiResponse(userText, contextMessages, persona, apiSettings, worldbook, userProfile, aiRef);
-      
-      const texts = persona.isSegmentResponse ? response.responseText.split('\n').filter(t => t.trim()) : [response.responseText];
-
-      texts.forEach((text, index) => {
-        const aiMsg: Message = {
-          id: (Date.now() + Math.random() + index).toString(),
-          personaId: persona.id,
-          groupId: isGroup ? currentGroupId || undefined : undefined,
-          role: 'model',
-          text: text,
-          msgType: 'text',
-          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-          isRead: false,
-          createdAt: Date.now() + 500 + (index * 1000),
-        };
-        
-        setMessages(prev => [...prev, aiMsg]);
-      });
-    } catch (e) {
-      console.error("Group AI Response Error:", e);
-    } finally {
-      pendingRequests.current = Math.max(0, pendingRequests.current - 1);
-      setIsTyping(pendingRequests.current > 0);
-    }
   };
 
   const handleRecall = async (msgId: string) => {
@@ -2072,7 +2198,7 @@ ${recentMessages}
     setShowChatSettings(false);
     try {
       const chatMessages = messages
-        .filter(m => m.personaId === currentPersona.id && !m.hidden && !m.isRecalled)
+        .filter(m => m.personaId === currentPersona.id && !m.groupId && !m.hidden && !m.isRecalled)
         .slice(-50)
         .map(m => ({
           role: m.role === 'model' ? 'assistant' : 'user',

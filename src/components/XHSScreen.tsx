@@ -241,7 +241,7 @@ export function XHSScreen({
       setIsTyping(true);
       try {
         const xhsHistory = privateChats[activeChatAuthorId] || [];
-        const wechatHistory = messages.filter(m => m.personaId === activeChatAuthorId).map(m => ({
+        const wechatHistory = messages.filter(m => m.personaId === activeChatAuthorId && !m.groupId).map(m => ({
           text: m.text,
           isMe: m.role === 'user',
           time: m.createdAt || 0

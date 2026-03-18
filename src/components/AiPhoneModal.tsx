@@ -129,7 +129,7 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
     // Real messages with the user
     const realUserMessages = allMessages
-      .filter(m => m.personaId === persona.id && !m.theaterId && !m.hidden)
+      .filter(m => m.personaId === persona.id && !m.groupId && !m.theaterId && !m.hidden)
       .map(m => ({
         role: m.role === 'user' ? 'other' : 'me', // In AI's phone, user is 'other', AI is 'me'
         text: m.text,

@@ -149,7 +149,7 @@ export function MusicScreen({
   // Filter messages for the current listening session (exclude theater messages to match main chat)
   // Memoize to prevent re-calculation on every render (e.g. time updates)
   const chatMessages = React.useMemo(() => {
-    return listeningWith ? messages.filter(m => m.personaId === listeningWith.id && !m.theaterId) : [];
+    return listeningWith ? messages.filter(m => m.personaId === listeningWith.id && !m.groupId && !m.theaterId) : [];
   }, [messages, listeningWith?.id]);
 
   const [hasCheckedAiSkip, setHasCheckedAiSkip] = useState(false);
