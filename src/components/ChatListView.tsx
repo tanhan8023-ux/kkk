@@ -11,11 +11,12 @@ interface Props {
   setCurrentGroupId: (id: string | null) => void;
   onCreateGroup: (name: string, memberIds: string[]) => void;
   defaultAiAvatar: string;
+  defaultUserAvatar: string;
   formatRelativeTime: (timestampMs: number | undefined) => string;
 }
 
 export const ChatListView = ({ 
-  personas, groups, messages, userProfile, setCurrentChatId, setCurrentGroupId, onCreateGroup, defaultAiAvatar, formatRelativeTime 
+  personas, groups, messages, userProfile, setCurrentChatId, setCurrentGroupId, onCreateGroup, defaultAiAvatar, defaultUserAvatar, formatRelativeTime 
 }: Props) => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -66,6 +67,9 @@ export const ChatListView = ({
               <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center overflow-hidden border border-neutral-200">
                 <div className="grid grid-cols-2 gap-0.5 p-0.5 w-full h-full">
                   {g.memberIds.slice(0, 4).map(mid => {
+                    if (mid === 'user') {
+                      return <img key={mid} src={userProfile.avatarUrl || defaultUserAvatar} className="w-full h-full object-cover" alt="member" />;
+                    }
                     const p = personas.find(pers => pers.id === mid);
                     return <img key={mid} src={p?.avatarUrl || defaultAiAvatar} className="w-full h-full object-cover" alt="member" />;
                   })}

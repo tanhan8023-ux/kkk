@@ -2672,6 +2672,7 @@ ${recentMessages}
               userProfile={userProfile}
               setCurrentChatId={setCurrentChatId}
               defaultAiAvatar={defaultAiAvatar}
+              defaultUserAvatar={defaultUserAvatar}
               formatRelativeTime={formatRelativeTime}
               groups={groups}
               setCurrentGroupId={setCurrentGroupId}

@@ -1400,7 +1400,7 @@ export default function App() {
     const newGroup: GroupChat = {
       id: Date.now().toString(),
       name,
-      memberIds: [...memberIds, 'user'], // Always include user
+      memberIds: ['user', ...memberIds], // Always include user
       ownerId: 'user',
       createdAt: Date.now()
     };
