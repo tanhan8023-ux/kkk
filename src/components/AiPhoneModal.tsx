@@ -35,14 +35,13 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
   }, [activeScreen]);
 
   const generateAiThought = async (screen: AppScreen) => {
-    if (!aiRef.current) {
-      aiRef.current = new GoogleGenAI({ apiKey: apiSettings.apiKey || process.env.GEMINI_API_KEY as string });
-    }
+      const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
+      const ai = new GoogleGenAI({ apiKey });
     
     const prompt = `你现在是 ${persona.name}，用户正在查看你的手机中的 ${screen} 页面。请用一句话简短地表达你此时的想法或心情，语气要符合你的人设。`;
     
     try {
-      const response = await aiRef.current.models.generateContent({
+      const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
       });

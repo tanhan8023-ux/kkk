@@ -659,9 +659,8 @@ export default function App() {
   const [isGeneratingXhs, setIsGeneratingXhs] = useState(false);
 
   useEffect(() => {
-    if (apiSettings.apiKey) {
-      aiRef.current = new GoogleGenAI({ apiKey: apiSettings.apiKey });
-    }
+    const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
+    aiRef.current = new GoogleGenAI({ apiKey });
   }, [apiSettings.apiKey]);
 
   // Background XHS Post Generation
@@ -1032,10 +1031,6 @@ export default function App() {
         if (!hasTodayEntry && !generatingDiariesRef.current.has(persona.id)) {
           generatingDiariesRef.current.add(persona.id);
           try {
-            if (!aiRef.current) {
-              aiRef.current = new GoogleGenAI({ apiKey: apiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string });
-            }
-            
             const entryData = await generateDiaryEntry(persona, apiSettings, worldbook, userProfile, aiRef as any);
             const newEntry: DiaryEntry = {
               id: Date.now().toString(),
@@ -1604,7 +1599,7 @@ export default function App() {
           .catch(() => {});
       }
     } catch (error: any) {
-      const errorMsgText = error?.message || "";
+      const errorMsgText = typeof error === 'string' ? error : (error?.message || JSON.stringify(error) || "");
       if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED")) {
         setLastApiErrorTime(Date.now());
       }
@@ -1613,11 +1608,18 @@ export default function App() {
       } else {
         console.error("Failed to generate reply:", error);
       }
+      let errorDisplay = "(网络错误，请重试)";
+      if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED") || errorMsgText.includes("quota")) {
+        errorDisplay = "(API 配额已用尽，请在设置中配置您自己的 API Key)";
+      } else if (errorMsgText.includes("API key not valid") || errorMsgText.includes("API_KEY_INVALID") || errorMsgText.includes("400")) {
+        errorDisplay = "(API Key 无效，请在设置中检查您的 API Key 是否正确)";
+      }
+      
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         personaId: personaId,
         role: 'model',
-        text: "(网络错误，请重试)",
+        text: errorDisplay,
         msgType: 'text',
         timestamp: new Date().toLocaleTimeString(),
         createdAt: Date.now()
@@ -1769,7 +1771,8 @@ export default function App() {
         personaId: targetPersona.id
       });
     } catch (e: any) {
-      if (e?.message?.includes("Failed to fetch") || e?.message?.includes("NetworkError")) {
+      const errorStr = typeof e === 'string' ? e : (e?.message || JSON.stringify(e) || "");
+      if (errorStr.includes("Failed to fetch") || errorStr.includes("NetworkError")) {
         console.warn("Failed to generate AI response for arrived order due to network error (Failed to fetch).");
       } else {
         console.error("Failed to generate AI response for arrived order", e);
@@ -1863,9 +1866,10 @@ export default function App() {
       }
 
     } catch (e: any) {
-      if (e?.message?.includes('频率限制') || e?.message?.includes('429')) {
+      const errorStr = typeof e === 'string' ? e : (e?.message || JSON.stringify(e) || "");
+      if (errorStr.includes('频率限制') || errorStr.includes('429')) {
         console.warn("Silence check skipped due to rate limit.");
-      } else if (e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+      } else if (errorStr.includes('Failed to fetch') || errorStr.includes('NetworkError')) {
         console.warn("Silence check skipped due to network error (Failed to fetch).");
       } else {
         console.error("Failed to generate silence check response", e);
@@ -2000,7 +2004,8 @@ export default function App() {
        });
        
     } catch (e: any) {
-      if (e?.message?.includes("Failed to fetch") || e?.message?.includes("NetworkError")) {
+      const errorStr = typeof e === 'string' ? e : (e?.message || JSON.stringify(e) || "");
+      if (errorStr.includes("Failed to fetch") || errorStr.includes("NetworkError")) {
         console.warn("Failed to generate AI response for order due to network error (Failed to fetch).");
       } else {
         console.error("Failed to generate AI response for order", e);

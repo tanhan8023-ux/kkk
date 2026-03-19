@@ -688,7 +688,8 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
         pesterPrompt += "\n\n【分段回复要求】请务必将你的回复分成多个短句，每句话之间必须用换行符（\\n）分隔。不要把所有内容写在一段里，要像真人连续发多条微信一样，每条消息简短自然。例如：\n第一句话\n第二句话\n第三句话";
       }
 
-      const aiRef = { current: new GoogleGenAI({ apiKey: apiSettings.apiKey || undefined || process.env.GEMINI_API_KEY as string }) };
+      const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
+      const aiRef = { current: new GoogleGenAI({ apiKey }) };
       
       // We use the existing context but inject our system instruction
       const eventPrompt = `[系统事件：用户已读你的消息但 ${timeSinceRead} 未回复。当前追问次数：${unreadPesterCount}。请决定反应。]`;
@@ -1861,9 +1862,12 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
           }]);
         } else {
           console.error("Chat error:", error);
-          let errorMsg = `错误: ${error.message}`;
-          if (error.message?.includes('配额已用尽') || error.message?.includes('quota')) {
-            errorMsg = "API 配额已用尽，请在设置中更换模型或 API Key。";
+          const errorStr = typeof error === 'string' ? error : (error?.message || JSON.stringify(error) || "未知错误");
+          let errorMsg = `错误: ${errorStr}`;
+          if (errorStr.includes('配额已用尽') || errorStr.includes('quota') || errorStr.includes('429')) {
+            errorMsg = "API 配额已用尽，请在设置中更换模型或配置您自己的 API Key。";
+          } else if (errorStr.includes('API key not valid') || errorStr.includes('API_KEY_INVALID') || errorStr.includes('400')) {
+            errorMsg = "API Key 无效，请在设置中检查您的 API Key 是否正确。";
           }
           setMessages(prev => [...prev, { 
             id: Date.now().toString(), 
@@ -2295,7 +2299,14 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
       }
     } catch (error: any) {
       console.error("Regenerate error:", error);
-      setMessages(prev => [...prev, { id: Date.now().toString(), personaId: currentPersona.id, role: 'model', text: `错误: ${error.message}`, timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }), isRead: true }]);
+      const errorStr = typeof error === 'string' ? error : (error?.message || JSON.stringify(error) || "未知错误");
+      let errorMsg = `错误: ${errorStr}`;
+      if (errorStr.includes('配额已用尽') || errorStr.includes('quota') || errorStr.includes('429')) {
+        errorMsg = "API 配额已用尽，请在设置中更换模型或配置您自己的 API Key。";
+      } else if (errorStr.includes('API key not valid') || errorStr.includes('API_KEY_INVALID') || errorStr.includes('400')) {
+        errorMsg = "API Key 无效，请在设置中检查您的 API Key 是否正确。";
+      }
+      setMessages(prev => [...prev, { id: Date.now().toString(), personaId: currentPersona.id, role: 'model', text: errorMsg, timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }), isRead: true }]);
     } finally {
       pendingRequests.current = Math.max(0, pendingRequests.current - 1);
       setIsLoading(false);

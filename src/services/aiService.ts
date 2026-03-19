@@ -56,9 +56,9 @@ export async function extractAndSaveMemory(
   aiRef: React.MutableRefObject<GoogleGenAI | null>,
   apiSettings: ApiSettings
 ): Promise<void> {
-  const apiKey = apiSettings.apiKey || process.env.GEMINI_API_KEY;
+  const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return;
-  const ai = aiRef.current || new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const prompt = `分析对话，提取用户偏好和上下文。请以 JSON 格式返回。`;
   try {
     const response = await ai.models.generateContent({
@@ -75,7 +75,7 @@ export async function extractAndSaveMemory(
 
 // 3. 图片生成
 export async function generateImage(prompt: string, providedApiKey: string): Promise<string> {
-  let apiKey = providedApiKey || process.env.GEMINI_API_KEY;
+  let apiKey = providedApiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(prompt)}`;
   const ai = new GoogleGenAI({ apiKey });
   try {
@@ -128,7 +128,7 @@ export async function generateDiaryEntry(persona: Persona, apiSettings: ApiSetti
 }
 
 export async function generateMoment(persona: Persona, apiSettings: ApiSettings, worldbook: WorldbookSettings) {
-  const apiKey = apiSettings.apiKey || process.env.GEMINI_API_KEY;
+  const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   const prompt = `发朋友圈，带[IMAGE: 画面]`;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
@@ -162,7 +162,7 @@ async function describeImage(imageUrl: string, apiKey: string) {
 }
 
 export async function transcribeAudio(audioBase64: string, mimeType: string, apiSettings: ApiSettings, aiRef: any) {
-  const apiKey = apiSettings.apiKey || process.env.GEMINI_API_KEY;
+  const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: { parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: "提取歌词" }] } });
   return res.text || "失败";
@@ -188,7 +188,7 @@ export async function fetchAiResponse(
   disableActions: boolean = false
 ) {
   const effectiveApiSettings = { ...apiSettings, ...customApiSettings };
-  const apiKey = effectiveApiSettings.apiKey || process.env.GEMINI_API_KEY;
+  const apiKey = effectiveApiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   
   // 视觉感知预处理
   let imageDescription: string | null = null;
@@ -217,7 +217,7 @@ export async function fetchAiResponse(
     disableActions ? "【严禁动作描写】只输出对话文字。" : ""
   ].filter(Boolean).join('\n\n');
 
-  const ai = aiRef.current || new GoogleGenAI({ apiKey: apiKey as string });
+  const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const contents = contextMessages.map(m => ({
     role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content || m.text }]
