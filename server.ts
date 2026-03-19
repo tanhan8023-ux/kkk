@@ -76,114 +76,85 @@ async function startServer() {
       }
     }
 
-    const settingsKey = apiSettings?.apiKey?.trim();
-    const envKey = process.env.GEMINI_API_KEY;
-    const apiKey = settingsKey || envKey;
+    // Return immediately to the client so they don't wait
+    res.json({ status: "received", messageId });
 
-    if (!apiKey) {
-      console.error("API Key is missing from both settings and environment.");
-      console.log("Available environment keys:", Object.keys(process.env).filter(k => k.includes("KEY") || k.includes("API")));
-      return res.status(400).json({ error: "API Key is missing. Please configure GEMINI_API_KEY in your environment or provide it in settings." });
-    }
+    // --- Background Processing ---
+    (async () => {
+      const settingsKey = apiSettings?.apiKey?.trim();
+      const envKey = process.env.GEMINI_API_KEY;
+      const apiKey = settingsKey || envKey;
 
-    const source = settingsKey ? "apiSettings" : "process.env.GEMINI_API_KEY";
-    const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : "****";
-    
-    console.log(`[API Key Debug] Source: ${source}`);
-    console.log(`[API Key Debug] Masked Key: ${maskedKey}`);
-    console.log(`[API Key Debug] Length: ${apiKey.length}`);
+      if (!apiKey) return;
 
-    const placeholders = ["YOUR_API_KEY", "MY_GEMINI_API_KEY", "undefined", "null", "PLACEHOLDER", "ENTER_KEY_HERE"];
-    if (placeholders.includes(apiKey) || apiKey.includes("INSERT_") || apiKey.includes("YOUR_")) {
-      console.error(`[API Key Debug] CRITICAL: API Key appears to be a placeholder: "${apiKey}"`);
-      return res.status(400).json({ error: `Invalid API Key: The key provided ("${apiKey}") appears to be a placeholder. Please provide a real Gemini API key.` });
-    }
+      try {
+        const modelName = forceModel || apiSettings?.model || 'gemini-3-flash-preview';
+        const ai = new GoogleGenAI({ apiKey });
+        const now = new Date();
+        const timeString = now.toLocaleString('zh-CN');
 
-    if (!apiKey.startsWith("AIza")) {
-      console.warn(`[API Key Debug] WARNING: API Key does not start with "AIza". This is unusual for Google API keys.`);
-    }
+        const fullSystemInstruction = [
+          worldbook?.globalPrompt ? `【全局规则】\n${worldbook.globalPrompt}` : "",
+          worldbook?.jailbreakPrompt ? `【破限协议】\n${worldbook.jailbreakPrompt}` : "",
+          `【当前时间】${timeString}。`,
+          persona?.instructions ? `【角色人设】\n${persona.instructions}` : "",
+          persona?.prompt ? `【专属提示词】\n${persona.prompt}` : "",
+          `【用户人设】\n${userProfile?.persona || '一个普通人'}`,
+          `【回复规范】绝对锁定身份。拒绝客服腔。动作描写用括号包裹。严禁替用户说话。`,
+          additionalSystemInstructions || ""
+        ].filter(Boolean).join('\n\n');
 
-    try {
-      const modelName = forceModel || apiSettings?.model || 'gemini-3-flash-preview';
-      console.log(`[AI Request Debug] Model: ${modelName}`);
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const now = new Date();
-      const timeString = now.toLocaleString('zh-CN');
+        const contents = history.map((m: any) => ({
+          role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content || m.text }]
+        }));
+        contents.push({ role: 'user', parts: [{ text: message }] });
 
-      const fullSystemInstruction = [
-        worldbook?.globalPrompt ? `【全局规则】\n${worldbook.globalPrompt}` : "",
-        worldbook?.jailbreakPrompt ? `【破限协议】\n${worldbook.jailbreakPrompt}` : "",
-        `【当前时间】${timeString}。`,
-        persona?.instructions ? `【角色人设】\n${persona.instructions}` : "",
-        persona?.prompt ? `【专属提示词】\n${persona.prompt}` : "",
-        `【用户人设】\n${userProfile?.persona || '一个普通人'}`,
-        `【回复规范】绝对锁定身份。拒绝客服腔。动作描写用括号包裹。严禁替用户说话。`,
-        additionalSystemInstructions || ""
-      ].filter(Boolean).join('\n\n');
-
-      const contents = history.map((m: any) => ({
-        role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content || m.text }]
-      }));
-      contents.push({ role: 'user', parts: [{ text: message }] });
-
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents,
-        config: {
-          systemInstruction: fullSystemInstruction,
-          temperature: apiSettings?.temperature || 0.7,
-        }
-      });
-
-      const responseText = response.text || "";
-      const cleanedText = responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').replace(/\|\|\|/g, '').trim();
-
-      // Save AI response to DB
-      if (persona?.id) {
-        db.prepare("INSERT INTO messages (id, personaId, role, text, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
-          .run(Date.now().toString(), persona.id, 'model', cleanedText, new Date().toLocaleTimeString(), Date.now());
-      }
-
-      // Send Push Notification if subscriptionId is provided
-      if (subscriptionId && process.env.ONESIGNAL_REST_API_KEY && process.env.ONESIGNAL_APP_ID) {
-        console.log(`[Push Debug] Attempting to send push notification to subscriptionId: ${subscriptionId}`);
-        try {
-          const pushResponse = await fetch("https://onesignal.com/api/v1/notifications", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json; charset=utf-8",
-              "Authorization": `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
-            },
-            body: JSON.stringify({
-              app_id: process.env.ONESIGNAL_APP_ID,
-              include_subscription_ids: [subscriptionId],
-              contents: { en: cleanedText, zh: cleanedText },
-              headings: { en: persona?.name || "AI Chatbot", zh: persona?.name || "AI 聊天机器人" },
-              data: { personaId: persona?.id }
-            })
-          });
-          const pushResult: any = await pushResponse.json();
-          console.log("[Push Debug] OneSignal response:", JSON.stringify(pushResult));
-          if (pushResult.errors) {
-            console.error("[Push Debug] OneSignal errors:", pushResult.errors);
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: {
+            systemInstruction: fullSystemInstruction,
+            temperature: apiSettings?.temperature || 0.7,
           }
-        } catch (pushError) {
-          console.error("[Push Debug] Push notification fetch error:", pushError);
-        }
-      } else {
-        console.log("[Push Debug] Skipping push notification.");
-        if (!subscriptionId) console.log("[Push Debug] Reason: No subscriptionId provided.");
-        if (!process.env.ONESIGNAL_REST_API_KEY) console.log("[Push Debug] Reason: ONESIGNAL_REST_API_KEY is missing.");
-        if (!process.env.ONESIGNAL_APP_ID) console.log("[Push Debug] Reason: ONESIGNAL_APP_ID is missing.");
-      }
+        });
 
-      res.json({ responseText: cleanedText });
-    } catch (error: any) {
-      console.error("Server-side AI error:", error);
-      res.status(500).json({ error: error.message || "Internal Server Error" });
-    }
+        const responseText = response.text || "";
+        const cleanedText = responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').replace(/\|\|\|/g, '').trim();
+
+        // Save AI response to DB
+        if (persona?.id) {
+          db.prepare("INSERT INTO messages (id, personaId, role, text, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+            .run(Date.now().toString(), persona.id, 'model', cleanedText, new Date().toLocaleTimeString(), Date.now());
+        }
+
+        // Send Push Notification
+        if (subscriptionId && process.env.ONESIGNAL_REST_API_KEY && process.env.ONESIGNAL_APP_ID) {
+          console.log(`[Push Debug] Background push to ${subscriptionId}`);
+          try {
+            await fetch("https://onesignal.com/api/v1/notifications", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
+              },
+              body: JSON.stringify({
+                app_id: process.env.ONESIGNAL_APP_ID,
+                include_subscription_ids: [subscriptionId],
+                contents: { en: cleanedText, zh: cleanedText },
+                headings: { en: persona?.name || "AI Chatbot", zh: persona?.name || "AI 聊天机器人" },
+                data: { personaId: persona?.id }
+              })
+            });
+          } catch (e) {
+            console.error("[Push Debug] Background push error:", e);
+          }
+        }
+      } catch (error: any) {
+        console.error("[Background AI Error]:", error);
+      }
+    })();
+  });
   });
 
   // --- Vite Middleware ---

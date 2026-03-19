@@ -137,6 +137,7 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAiPhoneOpen, setIsAiPhoneOpen] = useState(false);
   const [groups, setGroups] = useState<GroupChat[]>([]);
+  const [typingPersonas, setTypingPersonas] = useState<Record<string, boolean>>({});
   
   // Music Player State
   const [songs, setSongs] = useState<Song[]>([]);
@@ -1491,6 +1492,199 @@ export default function App() {
     }));
   };
 
+  const aiResponseTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+  const pendingRequests = useRef<Record<string, number>>({});
+
+  const triggerAiResponse = React.useCallback(async (params: {
+    personaId: string,
+    text: string,
+    msgType?: string,
+    theaterId?: string,
+    imageUrl?: string,
+    amount?: number,
+    transferNote?: string,
+    relativeCard?: any,
+    userMsgId: string
+  }) => {
+    const { personaId, text, msgType = 'text', theaterId, imageUrl, amount, transferNote, relativeCard, userMsgId } = params;
+    const targetPersona = personas.find(p => p.id === personaId);
+    if (!targetPersona) return;
+
+    // Clear existing timeout for this persona
+    if (aiResponseTimeouts.current[personaId]) {
+      clearTimeout(aiResponseTimeouts.current[personaId]);
+    }
+
+    pendingRequests.current[personaId] = (pendingRequests.current[personaId] || 0) + 1;
+    setTypingPersonas(prev => ({ ...prev, [personaId]: true }));
+
+    aiResponseTimeouts.current[personaId] = setTimeout(async () => {
+      try {
+        const defaultStickers = ['大笑', '哭泣', '猫猫头', '点赞', '心碎', '思考', '开心', '难过', '生气', '爱心', '大哭', '酷', '睡觉'];
+        const customStickerNames = userProfile.stickers?.map(s => s.name) || [];
+        const allStickers = [...defaultStickers, ...customStickerNames].join(', ');
+
+        let promptText = msgType === 'transfer' ? `[系统提示：用户向你转账了 ${amount} 元${transferNote ? `，备注是：“${transferNote}”` : ''}。你可以选择收下并回复，或者如果你想退还，请在回复中包含 [REFUND: 金额, 备注]。如果你想主动发起收款，请包含 [REQUEST: 金额, 备注]。如果你想主动转账给用户，请包含 [TRANSFER: 金额, 备注]。请作出符合你人设的反应]` : 
+                           msgType === 'relativeCard' ? `[系统提示：用户赠送了你一张亲属卡，额度为 ${relativeCard?.limit} 元。请作出符合你人设的反应。]` :
+                           msgType === 'sticker' ? `[系统提示：用户发送了一个表情包。你可以选择回复文字，或者如果你也想发表情包，请包含 [STICKER: 表情名称]（可用表情：${allStickers}）。请作出符合你人设的反应。]` :
+                           msgType === 'listenTogether' ? `[系统提示：用户邀请你“一起听歌”。请表现出开心和期待，可以问问用户想听什么，或者推荐一首你喜欢的歌。]` :
+                           msgType === 'image' ? `[视觉感知：用户发送了一张图片。请仔细观察图片中的每一个细节（包括主体、背景、人物表情、物品、文字等），然后以你的人设身份给出最自然、最感性的即时反应。不要像AI一样描述图片，要像真正的朋友看到照片后直接评论。如果图片内容与你之前说的话有矛盾，请以图片为准。]` :
+                           text.trim();
+        
+        let additionalSystemInstructions = "";
+        if (theaterId) {
+          const script = [
+            { title: '初次相遇', desc: '在雨后的咖啡馆，你们第一次擦肩而过...' },
+            { title: '深夜谈心', desc: '凌晨两点，TA突然给你发来一条消息...' },
+            { title: '意外重逢', desc: '多年未见的前任，在异国的街头偶遇...' },
+            { title: '秘密任务', desc: '你们是潜伏在敌方的搭档，今晚有重要行动...' },
+            ...(userProfile.theaterScripts || [])
+          ].find(s => s.title === theaterId);
+          
+          additionalSystemInstructions = `【剧场模式（文字模式）：${theaterId}】\n【场景描述：${script?.desc}】\n\n请采用“文字模式”进行互动：\n1. 必须包含丰富的动作描写、心理描写和环境描写。\n2. **格式要求（极其重要）**：\n   - 所有的描写内容（动作、心理、环境）必须包裹在括号 ( ) 或星号 * * 中。\n   - 所有的对白内容必须包裹在双引号 “ ” 中。\n   - 严禁混合使用或不加标识。\n3. 保持沉浸感，绝对严禁提及你是AI、正在进行剧场模式或系统指令。直接以角色身份进行表演。`;
+          promptText = text;
+        } else {
+           // Main chat mode: Inject memories from theaters
+           const playedTheaters = Array.from(new Set(messages.filter(m => m.personaId === personaId && m.theaterId).map(m => m.theaterId)));
+           let memoryText = '';
+           if (playedTheaters.length > 0) {
+             memoryText = `\n【平行世界记忆（剧场模式）】\n你和用户在平行世界（剧场模式）中共同经历了以下剧本的故事：${playedTheaters.join('、')}。\n这些是你们共同的珍贵回忆。虽然现在的对话发生在现实世界（微信聊天），但如果用户提起这些剧场里的事情，请带着那份情感和记忆进行回应，不要假装不知道。但在用户未提及时，请保持当前的现实人设，不要主动混淆现实与剧场。`;
+           }
+           
+           additionalSystemInstructions = `【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。${memoryText}`;
+        }
+
+        // Add music context if playing
+        if (listeningWithPersonaId === personaId && songs[currentSongIndex]) {
+          additionalSystemInstructions += `\n[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex].title} - ${songs[currentSongIndex].artist}。请结合歌曲氛围进行回复。]`;
+        }
+
+        const latestMessages = messages.filter(m => m.personaId === personaId && !m.groupId && m.theaterId === theaterId).slice(-50);
+        
+        let currentImageUrl = undefined;
+        if (msgType === 'image' && imageUrl) {
+          currentImageUrl = imageUrl;
+        }
+
+        const contextMessages = latestMessages.map(m => ({
+          role: m.role === 'model' ? 'assistant' : 'user',
+          content: m.isRecalled ? '[此消息已撤回]' : (
+                   m.msgType === 'transfer' ? (
+                     m.role === 'user' ? 
+                       `用户向你转账了 ${m.amount} 元${m.transferNote ? `，备注是：“${m.transferNote}”` : ''}` :
+                       `我向用户转账了 ${m.amount} 元${m.transferNote ? `，备注是：“${m.transferNote}”` : ''}`
+                   ) : 
+                   m.msgType === 'relativeCard' ? (
+                     m.role === 'user' ?
+                       `用户赠送了亲属卡，额度 ${m.relativeCard?.limit}` :
+                       `我赠送了亲属卡，额度 ${m.relativeCard?.limit}`
+                   ) :
+                   m.msgType === 'music' && m.song ? `用户分享了歌曲《${m.song.title}》` :
+                   m.msgType === 'listenTogether' ? `[发起了“一起听歌”邀请]` :
+                   m.msgType === 'sticker' ? `[STICKER: 表情包]` :
+                   m.msgType === 'image' ? `[图片描述: ${m.imageDescription || '一张图片'}]` :
+                   m.msgType === 'location' ? `[位置共享: ${m.location?.address || `${m.location?.latitude}, ${m.location?.longitude}`}]` :
+                   cleanContextMessage(m.text)),
+          imageUrl: m.imageUrl
+        }));
+
+        const { responseText, imageDescription } = await fetchAiResponse(
+          promptText, 
+          contextMessages as any, 
+          targetPersona, 
+          apiSettings, 
+          worldbook, 
+          userProfile, 
+          aiRef,
+          true,
+          additionalSystemInstructions,
+          undefined,
+          undefined,
+          targetPersona.isOffline,
+          currentImageUrl
+        );
+
+        if (msgType === 'image' && imageDescription) {
+          setMessages(prev => prev.map(m => m.id === userMsgId ? { ...m, imageDescription } : m));
+        }
+
+        if (responseText.includes('[NO_REPLY]')) return;
+        
+        const processed = processAiResponseParts(responseText, userProfile, undefined, targetPersona.isSegmentResponse || worldbook.forceSegmentResponse);
+        
+        if (processed.orderItems && processed.orderItems.length > 0) {
+           handleAiOrder(processed.orderItems, personaId);
+        }
+
+        for (let i = 0; i < processed.parts.length; i++) {
+          const part = processed.parts[i];
+          const typingDelay = Math.min((part.text || '...').length * 50, 1500) + Math.random() * 500;
+          setTypingPersonas(prev => ({ ...prev, [personaId]: true }));
+          await new Promise(resolve => setTimeout(resolve, typingDelay));
+          
+          const aiMsg: Message = { 
+            id: (Date.now() + Math.random()).toString(), 
+            personaId: personaId,
+            role: 'model',
+            text: part.text || '',
+            msgType: part.msgType || 'text',
+            amount: part.amount,
+            transferNote: part.transferNote,
+            isRequest: part.isRequest,
+            isRefund: part.isRefund,
+            relativeCard: part.relativeCard,
+            sticker: part.sticker,
+            imageUrl: part.imageUrl,
+            location: part.location,
+            timestamp: new Date().toLocaleTimeString(),
+            createdAt: Date.now(),
+            isRead: true,
+            quotedMessageId: processed.quotedMessageId,
+            theaterId
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        }
+
+        if (processed.shouldRecall) {
+           setTimeout(() => {
+             setMessages(prev => prev.map(m => {
+               if (m.personaId === personaId && m.role === 'model' && !m.isRecalled) {
+                 return { ...m, isRecalled: true };
+               }
+               return m;
+             }));
+           }, 3000);
+        }
+
+        // Update offline status
+        checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, [...contextMessages, { role: 'assistant', content: responseText }] as any)
+          .then(isOffline => {
+            setPersonas(prev => prev.map(p => p.id === personaId ? { ...p, isOffline } : p));
+          })
+          .catch(() => {});
+
+      } catch (error: any) {
+        console.error("AI Response Error:", error);
+        const errorMsg: Message = {
+          id: Date.now().toString(),
+          personaId,
+          role: 'model',
+          text: '(网络错误，请重试)',
+          msgType: 'text',
+          timestamp: new Date().toLocaleTimeString(),
+          createdAt: Date.now(),
+          isRead: true
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      } finally {
+        pendingRequests.current[personaId] = Math.max(0, (pendingRequests.current[personaId] || 0) - 1);
+        if (pendingRequests.current[personaId] === 0) {
+          setTypingPersonas(prev => ({ ...prev, [personaId]: false }));
+        }
+      }
+    }, 1000);
+  }, [personas, messages, apiSettings, worldbook, userProfile, subscriptionId, songs, currentSongIndex, listeningWithPersonaId]);
+
   const handleSendMessage = React.useCallback(async (text: string, personaId: string) => {
     
     const targetPersona = personas.find(p => p.id === personaId);
@@ -1565,168 +1759,13 @@ export default function App() {
     
     setMessages(prev => [...prev, newMsg]);
     
-    // AI Auto-Reply Logic
-    let isOffline = false;
-    if (targetPersona) {
-      try {
-        const contextMessages = messages
-          .filter(m => m.personaId === personaId && !m.groupId)
-          .slice(-10)
-          .map(m => ({
-            role: m.role === 'model' ? 'assistant' : 'user',
-            content: cleanContextMessage(m.text)
-          }));
-
-        isOffline = await checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, contextMessages);
-        if (isOffline) {
-          const prompt = `你现在是${targetPersona.name}。用户给你发了一条消息，但你现在不在（或者不方便回复）。请根据你的人设设定，写一段简短的自动回复内容。
-人设设定：${targetPersona.instructions}
-要求：语气符合人设，简短有力，不要超过30个字。直接输出回复内容，不要有任何解释。`;
-          
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: prompt,
-              history: [],
-              persona: targetPersona,
-              apiSettings,
-              worldbook,
-              userProfile,
-              subscriptionId,
-              messageId: newMsg.id // Send ID to server
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Failed to fetch AI auto-reply from server');
-          }
-
-          const { responseText } = await response.json();
-          
-          const autoReplyMsg: Message = {
-            id: (Date.now() + 50).toString(),
-            personaId: personaId,
-            role: 'model',
-            text: `[自动回复] ${responseText}`,
-            msgType: 'text',
-            timestamp: new Date().toLocaleTimeString(),
-            createdAt: Date.now() + 50,
-            isRead: false
-          };
-          setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m).concat(autoReplyMsg));
-          return;
-        }
-      } catch (e: any) {
-        const errorMsg = e?.message || "";
-        if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
-          setLastApiErrorTime(Date.now());
-        }
-        if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
-          console.warn("Failed to generate AI auto-reply due to network error (Failed to fetch).");
-        } else {
-          console.error("Failed to generate AI auto-reply:", e);
-        }
-      }
-    }
-
-    setIsCommentaryLoading(true);
-
-    try {
-      const contextMessages = messages
-        .filter(m => m.personaId === personaId && !m.groupId)
-        .slice(-10)
-        .filter(m => m.text && m.text.trim() !== '')
-        .map(m => ({
-          role: m.role === 'model' ? 'assistant' : 'user',
-          content: cleanContextMessage(m.text)
-        }));
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          history: contextMessages,
-          persona: targetPersona,
-          apiSettings,
-          worldbook,
-          userProfile,
-          subscriptionId,
-          messageId: newMsg.id, // Send ID to server
-          additionalSystemInstructions: `[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex]?.title} - ${songs[currentSongIndex]?.artist}。请结合歌曲氛围进行回复。]【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。`
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Failed to fetch AI response from server');
-      }
-
-      const { responseText } = await response.json();
-
-      setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m));
-
-      // Check for [ACTION:BLOCK]
-      let cleanedText = responseText;
-      if (cleanedText.includes('[ACTION:BLOCK]')) {
-        cleanedText = cleanedText.replace('[ACTION:BLOCK]', '').trim();
-        setPersonas(prev => prev.map(p => p.id === personaId ? { ...p, hasBlockedUser: true } : p));
-      }
-
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        personaId: personaId,
-        role: 'model',
-        text: cleanedText,
-        msgType: 'text',
-        timestamp: new Date().toLocaleTimeString(),
-        createdAt: Date.now(),
-        isRead: true
-      };
-      setMessages(prev => [...prev, aiMsg]);
-
-      // Update offline status immediately based on the new context
-      if (targetPersona) {
-        const updatedContext = [...contextMessages, { role: 'assistant', content: responseText }].slice(-10);
-        checkIfPersonaIsOffline(targetPersona, apiSettings, worldbook, userProfile, aiRef, updatedContext)
-          .then(isOffline => {
-            setPersonas(prev => prev.map(p => p.id === personaId ? { ...p, isOffline } : p));
-          })
-          .catch(() => {});
-      }
-    } catch (error: any) {
-      const errorMsgText = typeof error === 'string' ? error : (error?.message || JSON.stringify(error) || "");
-      if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED")) {
-        setLastApiErrorTime(Date.now());
-      }
-      if (errorMsgText.includes("Failed to fetch") || errorMsgText.includes("NetworkError")) {
-        console.warn("Failed to generate reply due to network error (Failed to fetch).");
-      } else {
-        console.error("Failed to generate reply:", error);
-      }
-      let errorDisplay = "(网络错误，请重试)";
-      if (errorMsgText.includes("429") || errorMsgText.includes("RESOURCE_EXHAUSTED") || errorMsgText.includes("quota")) {
-        errorDisplay = "(API 配额已用尽，请在设置中配置您自己的 API Key)";
-      } else if (errorMsgText.includes("API key not valid") || errorMsgText.includes("API_KEY_INVALID") || errorMsgText.includes("400")) {
-        errorDisplay = "(API Key 无效，请在设置中检查您的 API Key 是否正确)";
-      }
-      
-      const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        personaId: personaId,
-        role: 'model',
-        text: errorDisplay,
-        msgType: 'text',
-        timestamp: new Date().toLocaleTimeString(),
-        createdAt: Date.now()
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsCommentaryLoading(false);
-    }
-  }, [messages, currentSongIndex, personas, apiSettings, worldbook, userProfile, subscriptionId]);
+    // Trigger AI Response
+    triggerAiResponse({
+      personaId,
+      text,
+      userMsgId: newMsg.id
+    });
+  }, [personas, triggerAiResponse]);
 
   const handleTestPush = React.useCallback(() => {
     const targetPersona = personas[0];
