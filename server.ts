@@ -30,15 +30,38 @@ async function startServer() {
       forceModel
     } = req.body;
 
-    const apiKey = apiSettings?.apiKey?.trim() || process.env.GEMINI_API_KEY;
+    const settingsKey = apiSettings?.apiKey?.trim();
+    const envKey = process.env.GEMINI_API_KEY;
+    const apiKey = settingsKey || envKey;
+
     if (!apiKey) {
-      return res.status(400).json({ error: "API Key is missing" });
+      console.error("API Key is missing from both settings and environment.");
+      console.log("Available environment keys:", Object.keys(process.env).filter(k => k.includes("KEY") || k.includes("API")));
+      return res.status(400).json({ error: "API Key is missing. Please configure GEMINI_API_KEY in your environment or provide it in settings." });
+    }
+
+    const source = settingsKey ? "apiSettings" : "process.env.GEMINI_API_KEY";
+    const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : "****";
+    
+    console.log(`[API Key Debug] Source: ${source}`);
+    console.log(`[API Key Debug] Masked Key: ${maskedKey}`);
+    console.log(`[API Key Debug] Length: ${apiKey.length}`);
+
+    const placeholders = ["YOUR_API_KEY", "MY_GEMINI_API_KEY", "undefined", "null", "PLACEHOLDER", "ENTER_KEY_HERE"];
+    if (placeholders.includes(apiKey) || apiKey.includes("INSERT_") || apiKey.includes("YOUR_")) {
+      console.error(`[API Key Debug] CRITICAL: API Key appears to be a placeholder: "${apiKey}"`);
+      return res.status(400).json({ error: `Invalid API Key: The key provided ("${apiKey}") appears to be a placeholder. Please provide a real Gemini API key.` });
+    }
+
+    if (!apiKey.startsWith("AIza")) {
+      console.warn(`[API Key Debug] WARNING: API Key does not start with "AIza". This is unusual for Google API keys.`);
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const modelName = forceModel || apiSettings?.model || 'gemini-3-flash-preview';
+      console.log(`[AI Request Debug] Model: ${modelName}`);
       
+      const ai = new GoogleGenAI({ apiKey });
       const now = new Date();
       const timeString = now.toLocaleString('zh-CN');
 
