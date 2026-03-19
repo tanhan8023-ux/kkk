@@ -1,6 +1,6 @@
 {
-  "name": "WeChat Simulator",
-  "short_name": "WeChat",
+  "name": "Kem小手机",
+  "short_name": "Kem小手机",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",

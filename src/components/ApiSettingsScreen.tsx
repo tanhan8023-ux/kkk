@@ -8,10 +8,11 @@ interface Props {
   userProfile: UserProfile;
   onSave: (settings: ApiSettings, personas: Persona[], userProfile: UserProfile) => void;
   onBack: () => void;
+  onTestPush?: () => void;
   theme: ThemeSettings;
 }
 
-export function ApiSettingsScreen({ settings, personas: initialPersonas, userProfile: initialUserProfile, onSave, onBack, theme }: Props) {
+export function ApiSettingsScreen({ settings, personas: initialPersonas, userProfile: initialUserProfile, onSave, onBack, onTestPush, theme }: Props) {
   const [apiUrl, setApiUrl] = useState(settings.apiUrl);
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [model, setModel] = useState(settings.model);
@@ -575,6 +576,18 @@ export function ApiSettingsScreen({ settings, personas: initialPersonas, userPro
             >
               <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isProactiveMessagingEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
             </button>
+          </div>
+
+          <div className="pt-4 border-t border-neutral-100">
+            <button 
+              onClick={onTestPush}
+              className="w-full bg-orange-500 text-white font-medium py-3 rounded-xl active:bg-orange-600 transition-colors shadow-sm shadow-orange-500/30 text-[13px]"
+            >
+              测试后台推送通知 (5秒后发送)
+            </button>
+            <p className="text-[10px] text-neutral-400 mt-2 text-center">
+              点击后请立即关闭网页或切换标签页，测试是否能收到通知。
+            </p>
           </div>
 
           <div className="space-y-2 pt-4 border-t border-neutral-100">

@@ -113,6 +113,22 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isLocked, setIsLocked] = useState(true);
   const [lastApiErrorTime, setLastApiErrorTime] = useState<number>(0);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkOneSignal = setInterval(() => {
+      const OneSignal = (window as any).OneSignal;
+      if (OneSignal && OneSignal.User && OneSignal.User.PushSubscription) {
+        const id = OneSignal.User.PushSubscription.id;
+        if (id) {
+          console.log("OneSignal Subscription ID found:", id);
+          setSubscriptionId(id);
+          clearInterval(checkOneSignal);
+        }
+      }
+    }, 1000);
+    return () => clearInterval(checkOneSignal);
+  }, []);
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [isCommentaryLoading, setIsCommentaryLoading] = useState(false);
@@ -1522,13 +1538,32 @@ export default function App() {
 人设设定：${targetPersona.instructions}
 要求：语气符合人设，简短有力，不要超过30个字。直接输出回复内容，不要有任何解释。`;
           
-          const autoReplyText = await fetchAiResponse(prompt, [], targetPersona, apiSettings, worldbook, userProfile, aiRef);
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: prompt,
+              history: [],
+              persona: targetPersona,
+              apiSettings,
+              worldbook,
+              userProfile,
+              subscriptionId
+            })
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Failed to fetch AI auto-reply from server');
+          }
+
+          const { responseText } = await response.json();
           
           const autoReplyMsg: Message = {
             id: (Date.now() + 50).toString(),
             personaId: personaId,
             role: 'model',
-            text: `[自动回复] ${autoReplyText.responseText}`,
+            text: `[自动回复] ${responseText}`,
             msgType: 'text',
             timestamp: new Date().toLocaleTimeString(),
             createdAt: Date.now() + 50,
@@ -1562,17 +1597,27 @@ export default function App() {
           content: cleanContextMessage(m.text)
         }));
 
-      const { responseText } = await fetchAiResponse(
-        text,
-        contextMessages,
-        personas.find(p => p.id === personaId)!,
-        apiSettings,
-        worldbook,
-        userProfile,
-        aiRef,
-        true,
-        `[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex]?.title} - ${songs[currentSongIndex]?.artist}。请结合歌曲氛围进行回复。]【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。`
-      );
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: contextMessages,
+          persona: targetPersona,
+          apiSettings,
+          worldbook,
+          userProfile,
+          subscriptionId,
+          additionalSystemInstructions: `[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex]?.title} - ${songs[currentSongIndex]?.artist}。请结合歌曲氛围进行回复。]【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。`
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to fetch AI response from server');
+      }
+
+      const { responseText } = await response.json();
 
       setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, isRead: true, status: 'read' as const } : m));
 
@@ -1634,7 +1679,48 @@ export default function App() {
     } finally {
       setIsCommentaryLoading(false);
     }
-  }, [messages, currentSongIndex, personas, apiSettings, worldbook, userProfile]);
+  }, [messages, currentSongIndex, personas, apiSettings, worldbook, userProfile, subscriptionId]);
+
+  const handleTestPush = React.useCallback(() => {
+    const targetPersona = personas[0];
+    if (!targetPersona) return;
+
+    setTimeout(async () => {
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: "在吗？我想你了。",
+            history: [],
+            persona: targetPersona,
+            apiSettings,
+            worldbook,
+            userProfile,
+            subscriptionId
+          })
+        });
+
+        if (response.ok) {
+          const { responseText } = await response.json();
+          const aiMsg: Message = {
+            id: Date.now().toString(),
+            personaId: targetPersona.id,
+            role: 'model',
+            text: responseText,
+            msgType: 'text',
+            timestamp: new Date().toLocaleTimeString(),
+            createdAt: Date.now(),
+            isRead: false
+          };
+          setMessages(prev => [...prev, aiMsg]);
+          setUnreadCount(prev => prev + 1);
+        }
+      } catch (e) {
+        console.error("Test push failed:", e);
+      }
+    }, 5000);
+  }, [personas, apiSettings, worldbook, userProfile, subscriptionId]);
 
   const handleImport = async (jsonString: string) => {
     setIsImporting(true);
@@ -2240,6 +2326,7 @@ export default function App() {
                       setUserProfile(newUserProfile);
                     }} 
                     onBack={() => setCurrentScreen('home')} 
+                    onTestPush={handleTestPush}
                     theme={theme}
                   />
                 </motion.div>
