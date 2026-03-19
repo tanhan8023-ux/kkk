@@ -660,7 +660,13 @@ export default function App() {
 
   useEffect(() => {
     const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
-    aiRef.current = new GoogleGenAI({ apiKey });
+    if (apiKey) {
+      try {
+        aiRef.current = new GoogleGenAI({ apiKey });
+      } catch (e) {
+        console.error("Failed to initialize GoogleGenAI:", e);
+      }
+    }
   }, [apiSettings.apiKey]);
 
   // Background XHS Post Generation

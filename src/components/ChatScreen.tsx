@@ -689,7 +689,15 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
       }
 
       const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
-      const aiRef = { current: new GoogleGenAI({ apiKey }) };
+      if (!apiKey) return;
+      
+      let aiRef;
+      try {
+        aiRef = { current: new GoogleGenAI({ apiKey }) };
+      } catch (e) {
+        console.error("Failed to initialize GoogleGenAI:", e);
+        return;
+      }
       
       // We use the existing context but inject our system instruction
       const eventPrompt = `[系统事件：用户已读你的消息但 ${timeSinceRead} 未回复。当前追问次数：${unreadPesterCount}。请决定反应。]`;

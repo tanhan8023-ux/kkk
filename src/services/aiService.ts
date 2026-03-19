@@ -129,6 +129,7 @@ export async function generateDiaryEntry(persona: Persona, apiSettings: ApiSetti
 
 export async function generateMoment(persona: Persona, apiSettings: ApiSettings, worldbook: WorldbookSettings) {
   const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
   const prompt = `发朋友圈，带[IMAGE: 画面]`;
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
@@ -151,6 +152,7 @@ export async function generateXHSPost(apiSettings: ApiSettings, worldbook: World
 }
 
 async function describeImage(imageUrl: string, apiKey: string) {
+  if (!apiKey) return null;
   const ai = new GoogleGenAI({ apiKey });
   const mimeType = imageUrl.match(/data:(image\/[^;]+);base64,/)?.[1];
   if (!mimeType) return null;
@@ -163,6 +165,7 @@ async function describeImage(imageUrl: string, apiKey: string) {
 
 export async function transcribeAudio(audioBase64: string, mimeType: string, apiSettings: ApiSettings, aiRef: any) {
   const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
+  if (!apiKey) return "失败";
   const ai = new GoogleGenAI({ apiKey: apiKey as string });
   const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: { parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: "提取歌词" }] } });
   return res.text || "失败";
@@ -189,6 +192,7 @@ export async function fetchAiResponse(
 ) {
   const effectiveApiSettings = { ...apiSettings, ...customApiSettings };
   const apiKey = effectiveApiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
   
   // 视觉感知预处理
   let imageDescription: string | null = null;

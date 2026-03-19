@@ -36,7 +36,15 @@ export function AiPhoneModal({ persona, onClose, onUpdatePersona, allMessages, o
 
   const generateAiThought = async (screen: AppScreen) => {
       const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY as string;
-      const ai = new GoogleGenAI({ apiKey });
+      if (!apiKey) return;
+      
+      let ai;
+      try {
+        ai = new GoogleGenAI({ apiKey });
+      } catch (e) {
+        console.error("Failed to initialize GoogleGenAI:", e);
+        return;
+      }
     
     const prompt = `你现在是 ${persona.name}，用户正在查看你的手机中的 ${screen} 页面。请用一句话简短地表达你此时的想法或心情，语气要符合你的人设。`;
     
