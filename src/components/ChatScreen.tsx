@@ -400,6 +400,7 @@ export function ChatScreen({
         const isOffline = await checkIfPersonaIsOffline(persona, apiSettings, worldbook, userProfile, aiRef, []);
         if (isOffline) return;
 
+        const isMentioned = false; // Idle starter, no one mentioned the persona
         const contextMessages = messagesRef.current
           .filter(m => m.groupId === currentGroupId && !m.hidden)
           .slice(-10)
@@ -1697,7 +1698,7 @@ ${!isMentioned ? '- 如果你根据人设（比如正在忙、高冷、不想理
             imageUrl: (m as any).imageUrl
         }));
 
-        const { responseText: responseTextWithQuote, functionCalls, imageDescription } = await fetchAiResponse(
+        const { responseText: responseTextWithQuote, imageDescription } = await fetchAiResponse(
           promptText, 
           contextMessages, 
           personaForResponse, 
