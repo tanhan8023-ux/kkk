@@ -685,43 +685,51 @@ export default function App() {
     }
   }, [apiSettings.apiKey]);
 
-  // Sync messages from server periodically
+  // Sync messages from server periodically for all personas
   useEffect(() => {
-    if (!currentChatId || !isReady) return;
+    if (!isReady) return;
     
-    const syncMessages = async () => {
+    const syncAllMessages = async () => {
       try {
-        const lastMsg = messages.filter(m => m.personaId === currentChatId).sort((a, b) => b.createdAt - a.createdAt)[0];
-        const lastTimestamp = lastMsg ? lastMsg.createdAt : 0;
-        
-        const response = await fetch(`/api/messages/${currentChatId}?lastTimestamp=${lastTimestamp}`);
-        if (response.ok) {
-          const serverMsgs = await response.json();
-          if (serverMsgs.length > 0) {
-            setMessages(prev => {
-              const newMsgs = [...prev];
-              serverMsgs.forEach((sm: any) => {
-                if (!newMsgs.find(m => m.id === sm.id)) {
-                  newMsgs.push({
-                    ...sm,
-                    isRead: true // Assume read if syncing
-                  });
-                }
+        const personaIds = personas.map(p => p.id);
+        if (personaIds.length === 0) return;
+
+        for (const personaId of personaIds) {
+          const personaMsgs = messages.filter(m => m.personaId === personaId).sort((a, b) => b.createdAt - a.createdAt);
+          const lastTimestamp = personaMsgs.length > 0 ? personaMsgs[0].createdAt : 0;
+          
+          const response = await fetch(`/api/messages/${personaId}?lastTimestamp=${lastTimestamp}`);
+          if (response.ok) {
+            const serverMsgs = await response.json();
+            if (serverMsgs.length > 0) {
+              setMessages(prev => {
+                const newMsgs = [...prev];
+                let hasNew = false;
+                serverMsgs.forEach((sm: any) => {
+                  if (!newMsgs.find(m => m.id === sm.id)) {
+                    const isFromCurrentChat = currentChatId === personaId && currentScreen === 'chat' && !isLocked;
+                    newMsgs.push({
+                      ...sm,
+                      isRead: isFromCurrentChat
+                    });
+                    hasNew = true;
+                  }
+                });
+                return hasNew ? newMsgs : prev;
               });
-              return newMsgs;
-            });
+            }
           }
         }
       } catch (e) {
-        console.error("Failed to sync messages:", e);
+        console.error("Failed to sync all messages:", e);
       }
     };
 
-    const interval = setInterval(syncMessages, 5000);
-    syncMessages(); // Initial sync
+    const interval = setInterval(syncAllMessages, 8000);
+    syncAllMessages();
     
     return () => clearInterval(interval);
-  }, [currentChatId, isReady, messages.length]);
+  }, [isReady, currentChatId, currentScreen, isLocked, personas.length]);
 
   // Background XHS Post Generation
   useEffect(() => {

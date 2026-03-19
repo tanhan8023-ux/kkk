@@ -148,7 +148,7 @@ async function startServer() {
 
       // Send Push Notification if subscriptionId is provided
       if (subscriptionId && process.env.ONESIGNAL_REST_API_KEY && process.env.ONESIGNAL_APP_ID) {
-        console.log(`Attempting to send push notification to ${subscriptionId}`);
+        console.log(`[Push Debug] Attempting to send push notification to subscriptionId: ${subscriptionId}`);
         try {
           const pushResponse = await fetch("https://onesignal.com/api/v1/notifications", {
             method: "POST",
@@ -164,15 +164,19 @@ async function startServer() {
               data: { personaId: persona?.id }
             })
           });
-          const pushResult = await pushResponse.json();
-          console.log("OneSignal response:", pushResult);
+          const pushResult: any = await pushResponse.json();
+          console.log("[Push Debug] OneSignal response:", JSON.stringify(pushResult));
+          if (pushResult.errors) {
+            console.error("[Push Debug] OneSignal errors:", pushResult.errors);
+          }
         } catch (pushError) {
-          console.error("Push notification error:", pushError);
+          console.error("[Push Debug] Push notification fetch error:", pushError);
         }
       } else {
-        if (!subscriptionId) console.log("No subscriptionId provided for push.");
-        if (!process.env.ONESIGNAL_REST_API_KEY) console.log("ONESIGNAL_REST_API_KEY is missing.");
-        if (!process.env.ONESIGNAL_APP_ID) console.log("ONESIGNAL_APP_ID is missing.");
+        console.log("[Push Debug] Skipping push notification.");
+        if (!subscriptionId) console.log("[Push Debug] Reason: No subscriptionId provided.");
+        if (!process.env.ONESIGNAL_REST_API_KEY) console.log("[Push Debug] Reason: ONESIGNAL_REST_API_KEY is missing.");
+        if (!process.env.ONESIGNAL_APP_ID) console.log("[Push Debug] Reason: ONESIGNAL_APP_ID is missing.");
       }
 
       res.json({ responseText: cleanedText });
