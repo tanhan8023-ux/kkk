@@ -25,6 +25,8 @@
         await OneSignal.init({
           appId: "7ac5fb9d-291e-468b-ae27-8e702b8f1385",
         });
+        // 强制触发弹出提示
+        OneSignal.Slidedown.prompt();
       });
     </script>
   </head>
