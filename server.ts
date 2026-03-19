@@ -3,8 +3,24 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import Database from "better-sqlite3";
+import path from "path";
 
 dotenv.config();
+
+// Initialize Database
+const db = new Database("chat.db");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    personaId TEXT,
+    role TEXT,
+    text TEXT,
+    timestamp TEXT,
+    createdAt INTEGER,
+    isRead INTEGER DEFAULT 0
+  )
+`);
 
 async function startServer() {
   const app = express();
@@ -17,6 +33,26 @@ async function startServer() {
   });
 
   // --- API Routes ---
+  
+  // Get messages from server
+  app.get("/api/messages/:personaId", (req, res) => {
+    const { personaId } = req.params;
+    const { lastTimestamp } = req.query;
+    
+    let query = "SELECT * FROM messages WHERE personaId = ?";
+    const params = [personaId];
+    
+    if (lastTimestamp) {
+      query += " AND createdAt > ?";
+      params.push(lastTimestamp as string);
+    }
+    
+    query += " ORDER BY createdAt ASC";
+    
+    const rows = db.prepare(query).all(...params);
+    res.json(rows);
+  });
+
   app.post("/api/chat", async (req, res) => {
     const { 
       message, 
@@ -27,8 +63,18 @@ async function startServer() {
       userProfile, 
       subscriptionId,
       additionalSystemInstructions,
-      forceModel
+      forceModel,
+      messageId // Client-side generated ID for the user message
     } = req.body;
+
+    // Save user message to DB if it doesn't exist
+    if (messageId && persona?.id) {
+      const existing = db.prepare("SELECT id FROM messages WHERE id = ?").get(messageId);
+      if (!existing) {
+        db.prepare("INSERT INTO messages (id, personaId, role, text, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(messageId, persona.id, 'user', message, new Date().toLocaleTimeString(), Date.now());
+      }
+    }
 
     const settingsKey = apiSettings?.apiKey?.trim();
     const envKey = process.env.GEMINI_API_KEY;
@@ -93,6 +139,12 @@ async function startServer() {
 
       const responseText = response.text || "";
       const cleanedText = responseText.replace(/\[ID:\s*[^\]]+\]/gi, '').replace(/\|\|\|/g, '').trim();
+
+      // Save AI response to DB
+      if (persona?.id) {
+        db.prepare("INSERT INTO messages (id, personaId, role, text, timestamp, createdAt) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(Date.now().toString(), persona.id, 'model', cleanedText, new Date().toLocaleTimeString(), Date.now());
+      }
 
       // Send Push Notification if subscriptionId is provided
       if (subscriptionId && process.env.ONESIGNAL_REST_API_KEY && process.env.ONESIGNAL_APP_ID) {

@@ -685,13 +685,49 @@ export default function App() {
     }
   }, [apiSettings.apiKey]);
 
+  // Sync messages from server periodically
+  useEffect(() => {
+    if (!currentChatId || !isReady) return;
+    
+    const syncMessages = async () => {
+      try {
+        const lastMsg = messages.filter(m => m.personaId === currentChatId).sort((a, b) => b.createdAt - a.createdAt)[0];
+        const lastTimestamp = lastMsg ? lastMsg.createdAt : 0;
+        
+        const response = await fetch(`/api/messages/${currentChatId}?lastTimestamp=${lastTimestamp}`);
+        if (response.ok) {
+          const serverMsgs = await response.json();
+          if (serverMsgs.length > 0) {
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              serverMsgs.forEach((sm: any) => {
+                if (!newMsgs.find(m => m.id === sm.id)) {
+                  newMsgs.push({
+                    ...sm,
+                    isRead: true // Assume read if syncing
+                  });
+                }
+              });
+              return newMsgs;
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync messages:", e);
+      }
+    };
+
+    const interval = setInterval(syncMessages, 5000);
+    syncMessages(); // Initial sync
+    
+    return () => clearInterval(interval);
+  }, [currentChatId, isReady, messages.length]);
+
   // Background XHS Post Generation
   useEffect(() => {
     if (!isReady || !hasApiKey || apiSettings.isAutoXhsEnabled === false) return;
 
     const interval = setInterval(async () => {
-      // 10% chance to generate a new post every 5 minutes for more natural feel
-      if (Math.random() > 0.1) return;
       
       try {
         const newPostData = await generateXHSPost(apiSettings, worldbook, userProfile, aiRef);
@@ -745,6 +781,7 @@ export default function App() {
 
   // Initialization
   useEffect(() => {
+    setIsCommentaryLoading(false); // Reset loading state on mount to prevent stuck UI
     const loadAll = async () => {
       try {
         const migrate = async (key: string, setter: any, defaultVal?: any) => {
@@ -1548,7 +1585,8 @@ export default function App() {
               apiSettings,
               worldbook,
               userProfile,
-              subscriptionId
+              subscriptionId,
+              messageId: newMsg.id // Send ID to server
             })
           });
 
@@ -1608,6 +1646,7 @@ export default function App() {
           worldbook,
           userProfile,
           subscriptionId,
+          messageId: newMsg.id, // Send ID to server
           additionalSystemInstructions: `[当前场景：用户正在和你一起听歌。当前播放：${songs[currentSongIndex]?.title} - ${songs[currentSongIndex]?.artist}。请结合歌曲氛围进行回复。]【功能提示】你可以随时使用 [STICKER: 任意描述] 来发送表情包（例如 [STICKER: 开心的猫]）。`
         })
       });
