@@ -49,6 +49,72 @@ export async function generateLyrics(
   return responseText || "[00:00.00] 抱歉，未找到该歌曲的歌词。";
 }
 
+async function callAi(params: {
+  apiKey: string;
+  apiUrl?: string;
+  model: string;
+  systemInstruction?: string;
+  messages: { role: string; content: any }[];
+  temperature?: number;
+  aiRef?: any;
+}) {
+  if (params.apiUrl) {
+    let endpoint = params.apiUrl;
+    // 自动补全 OpenAI 兼容端点
+    if (!endpoint.endsWith('/chat/completions') && !endpoint.endsWith('/v1/messages')) {
+      endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
+    }
+
+    const messages = params.messages.map(m => ({
+      role: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }));
+    if (params.systemInstruction) {
+      messages.unshift({ role: 'system', content: params.systemInstruction });
+    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${params.apiKey}`
+      },
+      body: JSON.stringify({
+        model: params.model,
+        messages,
+        temperature: params.temperature,
+        stream: false
+      })
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
+  } else {
+    const ai = params.aiRef?.current || new GoogleGenAI({ apiKey: params.apiKey });
+    const contents = params.messages.map(m => ({
+      role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
+      parts: Array.isArray(m.content) ? m.content.map(c => {
+        if (typeof c === 'object' && c.type === 'image_url') {
+          const mimeMatch = c.image_url.url.match(/data:(image\/[^;]+);base64,/);
+          return { inlineData: { mimeType: mimeMatch?.[1] || 'image/png', data: c.image_url.url.split(',')[1] } };
+        }
+        return { text: typeof c === 'string' ? c : JSON.stringify(c) };
+      }) : [{ text: m.content }]
+    }));
+    const response = await ai.models.generateContent({
+      model: params.model,
+      contents,
+      config: {
+        systemInstruction: params.systemInstruction,
+        temperature: params.temperature,
+      }
+    });
+    return response.text || "";
+  }
+}
+
 // 2. 记忆提取逻辑
 export async function extractAndSaveMemory(
   userMessage: string,
@@ -58,25 +124,43 @@ export async function extractAndSaveMemory(
 ): Promise<void> {
   const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return;
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
-  const prompt = `分析对话，提取用户偏好和上下文。请以 JSON 格式返回。`;
+
+  const prompt = `分析对话并提取记忆。
+用户说：${userMessage}
+AI说：${aiResponse}
+请提取关键信息（如爱好、习惯、重要事件等），以JSON数组格式输出，如：["喜欢吃辣", "家里有只猫"]。如果没有新信息，输出空数组 []。`;
+
   try {
-    const response = await ai.models.generateContent({
+    const text = await callAi({
+      apiKey: apiKey as string,
+      apiUrl: apiSettings.apiUrl,
       model: "gemini-3-flash-preview",
-      contents: `用户：${userMessage}\nAI：${aiResponse}\n${prompt}`,
-      config: { responseMimeType: "application/json" }
+      messages: [{ role: "user", content: prompt }],
+      aiRef
     });
-    if (response.text) {
-      const { preference, context } = JSON.parse(response.text);
-      if (preference || context) await memoryService.saveMemory(preference, context);
+    const memories = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] || "[]");
+    if (Array.isArray(memories) && memories.length > 0) {
+      for (const m of memories) {
+        if (typeof m === 'string') {
+          await memoryService.saveMemory(m, "");
+        }
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error("Memory extraction failed:", e);
+  }
 }
 
 // 3. 图片生成
-export async function generateImage(prompt: string, providedApiKey: string): Promise<string> {
+export async function generateImage(prompt: string, providedApiKey: string, providedApiUrl?: string): Promise<string> {
   let apiKey = providedApiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(prompt)}`;
+
+  if (providedApiUrl) {
+    // If using a proxy, we might not be able to use Imagen easily if the proxy doesn't support it
+    // But we can try to hit the same endpoint if it's a Gemini proxy
+  }
+
   const ai = new GoogleGenAI({ apiKey });
   try {
     const imageResponse = await ai.models.generateContent({
@@ -131,44 +215,83 @@ export async function generateMoment(persona: Persona, apiSettings: ApiSettings,
   const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("API Key is missing");
   const prompt = `发朋友圈，带[IMAGE: 画面]`;
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
-  const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
-  let content = res.text || "";
+  
+  const content = await callAi({
+    apiKey: apiKey as string,
+    apiUrl: apiSettings.apiUrl,
+    model: "gemini-3-flash-preview",
+    messages: [{ role: "user", content: prompt }]
+  });
+
+  let text = content || "";
   let imageUrl;
-  const imageMatch = content.match(/\[IMAGE:\s*([^\]]+)\]/i);
+  const imageMatch = text.match(/\[IMAGE:\s*([^\]]+)\]/i);
   if (imageMatch) {
-    content = content.replace(imageMatch[0], "").trim();
-    imageUrl = await generateImage(imageMatch[1], apiKey as string);
+    text = text.replace(imageMatch[0], "").trim();
+    imageUrl = await generateImage(imageMatch[1], apiKey as string, apiSettings.apiUrl);
   }
-  return { content, imageUrl };
+  return { content: text, imageUrl };
 }
 
 export async function generateXHSPost(apiSettings: ApiSettings, worldbook: WorldbookSettings, userProfile: UserProfile, aiRef: any) {
   const prompt = `生成小红书。`;
   const { responseText } = await fetchAiResponse(prompt, [], { id: 'xhs' } as any, apiSettings, worldbook, userProfile, aiRef, false, "", undefined, undefined, undefined, undefined, undefined, true);
   const data = JSON.parse(responseText.match(/\{[\s\S]*\}/)?.[0] || "{}");
-  const [mainImg, avatarImg] = await Promise.all([generateImage(data.imagePrompt, apiSettings.apiKey), generateImage(data.authorAvatarPrompt, apiSettings.apiKey)]);
+  const [mainImg, avatarImg] = await Promise.all([
+    generateImage(data.imagePrompt, apiSettings.apiKey || "", apiSettings.apiUrl), 
+    generateImage(data.authorAvatarPrompt, apiSettings.apiKey || "", apiSettings.apiUrl)
+  ]);
   return { title: data.title, content: data.content, images: [mainImg], authorName: data.authorName, authorAvatar: avatarImg };
 }
 
-async function describeImage(imageUrl: string, apiKey: string) {
+async function describeImage(imageUrl: string, apiKey: string, apiUrl?: string) {
   if (!apiKey) return null;
-  const ai = new GoogleGenAI({ apiKey });
-  const mimeType = imageUrl.match(/data:(image\/[^;]+);base64,/)?.[1];
-  if (!mimeType) return null;
-  const res = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: [{ role: "user", parts: [{ text: "客观描述图片内容" }, { inlineData: { mimeType, data: imageUrl.split(',')[1] } }] }]
-  });
-  return res.text?.trim() || null;
+  
+  try {
+    const text = await callAi({
+      apiKey,
+      apiUrl,
+      model: "gemini-3-flash-preview",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "客观描述图片内容" },
+            { type: "image_url", image_url: { url: imageUrl } }
+          ]
+        }
+      ]
+    });
+    return text || null;
+  } catch (e) {
+    console.error("describeImage error:", e);
+    return null;
+  }
 }
 
 export async function transcribeAudio(audioBase64: string, mimeType: string, apiSettings: ApiSettings, aiRef: any) {
   const apiKey = apiSettings.apiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) return "失败";
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
-  const res = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: { parts: [{ inlineData: { mimeType, data: audioBase64 } }, { text: "提取歌词" }] } });
-  return res.text || "失败";
+  
+  try {
+    const text = await callAi({
+      apiKey: apiKey as string,
+      apiUrl: apiSettings.apiUrl,
+      model: "gemini-3-flash-preview",
+      messages: [{ 
+        role: "user", 
+        content: [
+          { inlineData: { mimeType, data: audioBase64 } }, 
+          { text: "提取歌词" }
+        ] 
+      }],
+      aiRef
+    });
+    return text || "失败";
+  } catch (e) {
+    console.error("Transcription failed:", e);
+    return "失败";
+  }
 }
 
 // 5. 核心对话接口 (整合修复后的逻辑)
@@ -197,7 +320,7 @@ export async function fetchAiResponse(
   // 视觉感知预处理
   let imageDescription: string | null = null;
   if (imageUrl && imageUrl.startsWith('data:image')) {
-    imageDescription = await describeImage(imageUrl, apiKey as string);
+    imageDescription = await describeImage(imageUrl, apiKey as string, effectiveApiSettings.apiUrl);
     if (imageDescription) {
       promptText = `【视觉感知报告】\n用户刚刚发了一张照片，内容描述：\n"${imageDescription}"\n\n${promptText}`;
     }
@@ -221,36 +344,36 @@ export async function fetchAiResponse(
     disableActions ? "【严禁动作描写】只输出对话文字。" : ""
   ].filter(Boolean).join('\n\n');
 
-  const ai = new GoogleGenAI({ apiKey: apiKey as string });
-  const contents = contextMessages.map(m => ({
+  const modelName = forceModel || effectiveApiSettings.model || 'gemini-3-flash-preview';
+  const messages = contextMessages.map(m => ({
     role: m.role === 'model' || m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content || m.text }]
+    content: m.content || m.text
   }));
-  
-  // 处理当前输入
-  const currentParts: any[] = [];
-  if (imageUrl && !effectiveApiSettings.apiUrl) {
-    const mimeMatch = imageUrl.match(/data:(image\/[^;]+);base64,/);
-    if (mimeMatch) currentParts.push({ inlineData: { mimeType: mimeMatch[1], data: imageUrl.split(',')[1] } });
+
+  let currentContent: any = promptText;
+  if (imageUrl) {
+    currentContent = [
+      { type: "text", text: promptText },
+      { type: "image_url", image_url: { url: imageUrl } }
+    ];
   }
-  currentParts.push({ text: promptText });
-  contents.push({ role: 'user', parts: currentParts });
+  messages.push({ role: 'user', content: currentContent });
 
   try {
-    const response = await ai.models.generateContent({
-      model: forceModel || effectiveApiSettings.model || 'gemini-3-flash-preview',
-      contents: contents,
-      config: {
-        systemInstruction: fullSystemInstruction,
-        temperature: effectiveApiSettings.temperature,
-      }
+    const text = await callAi({
+      apiKey: apiKey as string,
+      apiUrl: effectiveApiSettings.apiUrl,
+      model: modelName,
+      systemInstruction: fullSystemInstruction,
+      messages,
+      temperature: effectiveApiSettings.temperature,
+      aiRef
     });
 
-    const text = response.text || "...";
     if (!isSystemTask) await extractAndSaveMemory(promptText, text, aiRef, effectiveApiSettings);
-    
     return { responseText: processAiResponse(text), imageDescription };
   } catch (error: any) {
+    console.error("AI Response Error:", error);
     throw error;
   }
 }
